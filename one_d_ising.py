@@ -12,6 +12,7 @@ def get_g(t: float):
 def get_B(t: float):
     return np.maximum(B1 * np.ones_like(t), B0 + (B1 - B0) * t / (T - t1))
 
+
 def get_translationally_invariant_hamiltonian(J, h, k, g, B):
     return np.array([[0, 1j*J*np.exp(-1j*k) - 1j*h, 1j * g, 0],
                      [-1j*J*np.exp(1j*k) + 1j*h, 0, 0, 0],
@@ -24,7 +25,7 @@ def get_translationally_invariant_spectrum(J, h, k, g, B):
     return E
 
 if __name__ == '__main__':
-    num_sites = 3
+    num_sites = 2
     num_sublattices = 6
     system_shape = (num_sites, num_sublattices, num_sites, num_sublattices)
     non_gauge_shape = (num_sites, 4, num_sites, 4)
@@ -36,7 +37,7 @@ if __name__ == '__main__':
     g0 = 0.3
     B1 = 0.
     B0 = 3.
-    T = 300.
+    T = 30.
     t1 = T / 4
 
     # Es = []
@@ -55,7 +56,7 @@ if __name__ == '__main__':
     decoupled_hamiltonian_matrix = decoupled_hamiltonian.get_matrix()
     ground_state = decoupled_hamiltonian.get_ground_state()
 
-    S0_tensor = np.zeros(system_shape, dtype=complex)
+    S0_tensor = np.zeros(system_shape)
 
     S_non_gauge = SingleParticleDensityMatrix(non_gauge_shape)
     S_non_gauge.randomize()
@@ -101,16 +102,16 @@ if __name__ == '__main__':
 
 
     Ud = hamiltonian.full_cycle_unitary_faster(integration_params, 0, T)
-    # Ud_trotter = hamiltonian.full_cycle_unitary_trotterize(0, T, rtol=1e-8)
-    # for dt in [1.,0.1,0.01]:
-    #     hamiltonian.dt = dt
-    #     Ud_trotter = hamiltonian.full_cycle_unitary_trotterize(0, T)
-    #     print(np.sum(np.abs(Ud-Ud_trotter)))
+    Ud_trotter = hamiltonian.full_cycle_unitary_trotterize(0, T, atol=1e-3)
+    for dt in [1.,0.1,0.01]:
+        hamiltonian.dt = dt
+        Ud_trotter = hamiltonian.full_cycle_unitary_trotterize(0, T)
+        print(np.sum(np.abs(Ud-Ud_trotter)))
 
     Es = []
     Fs = []
     for _ in range(50):
-        if np.random.rand() < 0.:
+        if np.random.rand() < 0.1:
             error_name = np.random.choice(list(all_errors_unitaries.keys()))
             S.evolve_with_unitary(all_errors_unitaries[error_name])
             print(error_name)

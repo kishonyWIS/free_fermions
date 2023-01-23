@@ -1,6 +1,6 @@
 from typing import Union, Callable, Optional
 import numpy as np
-from scipy.integrate import complex_ode
+from scipy.integrate import ode
 from scipy.linalg import eigh
 from scipy.stats import special_ortho_group
 from scipy.linalg import expm
@@ -25,7 +25,7 @@ def matrix_to_tensor(matrix: np.ndarray, system_shape: tuple[int, ...]) -> np.nd
     return matrix.reshape(system_shape)
 
 
-def get_system_matrix_shape(system_shape: tuple[int]):
+def get_system_matrix_shape(system_shape: tuple[int, ...]):
     num_dims = len(system_shape)
     shape1 = np.prod(system_shape[:num_dims // 2])
     shape2 = np.prod(system_shape[num_dims // 2:])
@@ -120,7 +120,7 @@ class HamiltonianTerm:
     @strength.setter
     def strength(self, new_strength: Union[float, list[float]]):
         self._strength = new_strength
-        self._time_independent_tensor = np.zeros(self.system_shape, dtype=complex)
+        self._time_independent_tensor = np.zeros(self.system_shape)
         if self.gauge_field is None:
             if self.site1 is not None and self.site2 is not None:
                 self._time_independent_tensor[self.site1, self.sublattice1, self.site2, self.sublattice2] += \
@@ -139,7 +139,7 @@ class HamiltonianTerm:
     def time_independent_tensor(self) -> np.ndarray:
         if self.gauge_field is not None:
             # Setting strength to be a gauge field
-            self._time_independent_tensor = np.zeros(self.system_shape, dtype=complex)
+            self._time_independent_tensor = np.zeros(self.system_shape)
             add_to_diag(
                 self._time_independent_tensor[:self.system_shape[0] - self.site_offset, self.sublattice1,
                 self.site_offset:, self.sublattice2],
@@ -156,27 +156,29 @@ class HamiltonianTerm:
     def time_independent_matrix(self) -> np.ndarray:
         return tensor_to_matrix(self.time_independent_tensor, self.system_shape)
 
-    # def small_unitary(self, t) -> np.ndarray:
-    #     small_U = np.eye(get_system_matrix_shape(self.system_shape)[0], dtype=complex)
-    #     small_U = matrix_to_tensor(small_U, self.system_shape)
-    #     if self.gauge_field is None:
-    #         if self.gauge_field is None:
-    #             if self.site1 is not None and self.site2 is not None:
-    #                 M = np.ndarray()
-    #                 self._time_independent_tensor[self.site1, self.sublattice1, self.site2, self.sublattice2] += \
-    #                     2 * self._strength
-    #                 self._time_independent_tensor[self.site2, self.sublattice2, self.site1, self.sublattice1] -= \
-    #                     2 * self._strength
-    #             elif self.site_offset is not None:
-    #                 add_to_diag(
-    #                     self._time_independent_tensor[:self.system_shape[0] - self.site_offset, self.sublattice1,
-    #                     self.site_offset:,
-    #                     self.sublattice2], 2 * self._strength)
-    #                 add_to_diag(
-    #                     self._time_independent_tensor[self.site_offset:, self.sublattice2,
-    #                     :self.system_shape[2] - self.site_offset,
-    #                     self.sublattice1], -2 * self._strength)
-    #     return expm(self.get_time_dependent_matrix(t) * self.dt)
+    def small_unitary(self, t) -> np.ndarray:
+        small_U = np.eye(get_system_matrix_shape(self.system_shape)[0])
+        time_dependence = 1 if self.time_dependence is None else self.time_dependence(t)
+        small_U_2by2 = expm(np.array([[0, 2], [-2, 0]]) * self.strength * time_dependence * self.dt)
+        if self.site1 is not None and self.site2 is not None:
+            i1 = site_and_sublattice_to_flat_index(self.site1, self.sublattice1, self.system_shape)
+            i2 = site_and_sublattice_to_flat_index(self.site2, self.sublattice2, self.system_shape)
+            small_U[np.ix_([i1,i2],[i1,i2])] = small_U_2by2
+        elif self.site_offset is not None:
+            for site1 in range(self.system_shape[0] - self.site_offset):
+                site2 = site1 + self.site_offset
+                i1 = site_and_sublattice_to_flat_index(site1, self.sublattice1, self.system_shape)
+                i2 = site_and_sublattice_to_flat_index(site2, self.sublattice2, self.system_shape)
+                if self.gauge_field is None:
+                    small_U[np.ix_([i1, i2], [i1, i2])] = small_U_2by2
+                else:
+                    gauge = self.gauge_field.tensor[site1, self.gauge_sublattice1,
+                                                    site1+self.gauge_site_offset, self.gauge_sublattice2]
+                    if gauge > 0:
+                        small_U[np.ix_([i1, i2], [i1, i2])] = small_U_2by2
+                    else:
+                        small_U[np.ix_([i1, i2], [i1, i2])] = small_U_2by2.T
+        return small_U
 
     def apply_time_dependence(self, arr: np.ndarray, t: float = None) -> np.ndarray:
         if self.time_dependence is None:
@@ -234,18 +236,18 @@ class FreeFermionHamiltonian:
         return (M @ c.reshape(M.shape[1], -1)).reshape(-1)
 
     def evolve_single_fermion(self, c0: np.ndarray, integration_params: dict, t0: float, tf: float) -> np.ndarray:
-        ode = complex_ode(self.dcdt)
-        ode.set_integrator(**integration_params)
-        ode.set_initial_value(c0, t0)
-        ode.integrate(tf)
-        return ode.y
+        ode_instance = ode(self.dcdt)
+        ode_instance.set_integrator(**integration_params)
+        ode_instance.set_initial_value(c0, t0)
+        ode_instance.integrate(tf)
+        return ode_instance.y
 
     def evolve_single_fermion_faster(self, c0: np.ndarray, integration_params: dict, t0: float, tf: float) -> np.ndarray:
-        ode = complex_ode(self.dcdt_faster)
-        ode.set_integrator(**integration_params)
-        ode.set_initial_value(c0, t0)
-        ode.integrate(tf)
-        return ode.y
+        ode_instance = ode(self.dcdt_faster)
+        ode_instance.set_integrator(**integration_params)
+        ode_instance.set_initial_value(c0, t0)
+        ode_instance.integrate(tf)
+        return ode_instance.y
 
     def evolve_single_fermion_ivp(self, c0: np.ndarray, integration_params: dict, t0: float, tf: float) -> np.ndarray:
         sol = solve_ivp(self.dcdt_faster, (t0,tf), c0, vectorized=True, dense_output=True, **integration_params)
@@ -254,26 +256,26 @@ class FreeFermionHamiltonian:
     def full_cycle_unitary(self, integration_params: dict, t0: float, tf: float) -> np.ndarray:
         if np.all([x.time_dependence is None for x in self.terms.values()]):
             return expm(self.get_matrix() * (tf-t0))
-        c_basis = np.eye(self.system_shape[0] * self.system_shape[1], dtype=complex)
+        c_basis = np.eye(self.system_shape[0] * self.system_shape[1])
         evolve_vectorize = np.vectorize(self.evolve_single_fermion, signature='(m),(),(),()->(m)')
         return evolve_vectorize(c_basis, integration_params=integration_params, t0=t0, tf=tf).T
 
     def full_cycle_unitary_faster(self, integration_params: dict, t0: float, tf: float) -> np.ndarray:
         if np.all([x.time_dependence is None for x in self.terms.values()]):
             return expm(self.get_matrix() * (tf-t0))
-        c_basis = np.eye(self.system_shape[0] * self.system_shape[1], dtype=complex).reshape(-1)
+        c_basis = np.eye(self.system_shape[0] * self.system_shape[1]).reshape(-1)
         return self.evolve_single_fermion_faster(c_basis, integration_params=integration_params, t0=t0, tf=tf).reshape(
             self.system_shape[0] * self.system_shape[1], self.system_shape[0] * self.system_shape[1])
 
     def full_cycle_unitary_ivp(self, integration_params: dict, t0: float, tf: float) -> np.ndarray:
         if np.all([x.time_dependence is None for x in self.terms.values()]):
             return expm(self.get_matrix() * (tf-t0))
-        c_basis = np.eye(self.system_shape[0] * self.system_shape[1], dtype=complex).reshape(-1)
+        c_basis = np.eye(self.system_shape[0] * self.system_shape[1]).reshape(-1)
         return self.evolve_single_fermion_ivp(c_basis, integration_params=integration_params, t0=t0, tf=tf).reshape(
             self.system_shape[0] * self.system_shape[1], self.system_shape[0] * self.system_shape[1])
 
-    def full_cycle_unitary_trotterize(self, t0: float, tf: float, dt: Optional[float] = None, rtol: Optional[float] = None) -> np.ndarray:
-        if rtol is None:
+    def full_cycle_unitary_trotterize(self, t0: float, tf: float, dt: Optional[float] = None, atol: Optional[float] = None) -> np.ndarray:
+        if atol is None:
             if dt is not None:
                 self.dt = dt
             Ud = self._full_cycle_unitary_trotterize_run(t0, tf)
@@ -283,17 +285,17 @@ class FreeFermionHamiltonian:
             else:
                 self.dt = 1.
             Ud_prev = np.full((self.system_shape[0] * self.system_shape[1],
-                               self.system_shape[0] * self.system_shape[1]), np.inf, dtype=complex)
+                               self.system_shape[0] * self.system_shape[1]), 100)
             relative_error = np.inf
-            while relative_error > rtol:
+            while relative_error > atol:
                 self.dt = self.dt/5.
                 Ud = self._full_cycle_unitary_trotterize_run(t0, tf)
-                relative_error = np.sum(np.abs(Ud-Ud_prev)) / np.sum(np.abs(Ud))
+                relative_error = np.mean(np.abs(np.eye(Ud.shape[0]) - Ud@Ud_prev.conj().T))
                 Ud_prev = Ud
         return Ud
 
     def _full_cycle_unitary_trotterize_run(self, t0, tf):
-        Ud = np.eye(self.system_shape[0] * self.system_shape[1], dtype=complex)
+        Ud = np.eye(self.system_shape[0] * self.system_shape[1])
         for t in np.arange(0, int((tf - t0) / self.dt) + 1) * self.dt + t0:
             for term in self.terms.values():
                 Ud = term.small_unitary(t) @ Ud
