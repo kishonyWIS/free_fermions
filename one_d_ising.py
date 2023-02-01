@@ -1,16 +1,32 @@
+from time import time
+from typing import Callable
+
 import numpy as np
-from free_fermion_hamiltonian import FreeFermionHamiltonian, SingleParticleDensityMatrix, \
-    HamiltonianTerm, get_fermion_bilinear_unitary, fidelity
+import scipy
+
+from free_fermion_hamiltonian import FreeFermionHamiltonian, SingleParticleDensityMatrix, get_fermion_bilinear_unitary
 from scipy.linalg import eigh
 from matplotlib import pyplot as plt
 
 
+def gaussian_filter(t, sigma):
+    return 1/(sigma*np.sqrt(2*np.pi))*np.exp(-t**2/(2*sigma**2))
+
+
 def get_g(t: float):
-    return np.minimum(g0 * np.ones_like(t), (1 - np.abs(2 * t / T - 1)) * T / (2 * t1) * g0)
+    # return g0 * np.exp(-(t-T/2)**2/(T**2 / 25))
+    return np.maximum(np.minimum(g0 * np.ones_like(t), (1 - np.abs(2 * t / T - 1)) * T / (2 * t1) * g0), 0)
 
 
 def get_B(t: float):
-    return np.maximum(B1 * np.ones_like(t), B0 + (B1 - B0) * t / (T - t1))
+    return np.minimum(np.maximum(B1 * np.ones_like(t), B0 + (B1 - B0) * t / (T - t1)), B0)
+
+
+def get_smoothed_func(t: float, func: Callable,  sigma: float):
+    N = 100
+    ts = np.linspace(-3*sigma, 3*sigma, N)
+    dt = ts[1]-ts[0]
+    return np.sum(np.array(list(map(func,ts+t)))*gaussian_filter(ts,sigma))*dt
 
 
 def get_translationally_invariant_hamiltonian(J, h, k, g, B):
@@ -19,26 +35,29 @@ def get_translationally_invariant_hamiltonian(J, h, k, g, B):
                      [-1j*g, 0, 0, -1j*B],
                      [0, 0, 1j*B, 0]])
 
+
 def get_translationally_invariant_spectrum(J, h, k, g, B):
     H = get_translationally_invariant_hamiltonian(J, h, k, g, B)
     E, _ = eigh(H)
     return E
 
+
 if __name__ == '__main__':
-    num_sites = 2
+    num_sites = 10
     num_sublattices = 6
     system_shape = (num_sites, num_sublattices, num_sites, num_sublattices)
     non_gauge_shape = (num_sites, 4, num_sites, 4)
     gauge_shape = (num_sites, 2, num_sites, 2)
     non_gauge_idxs = np.ix_(range(num_sites), [0, 3, 4, 5], range(num_sites), [0, 3, 4, 5])
     gauge_idxs = np.ix_(range(num_sites), [1, 2], range(num_sites), [1, 2])
-    h = 1
-    J = 0.7
-    g0 = 0.3
+    h = 0.7
+    J = 1.
+    g0 = 0.5
     B1 = 0.
     B0 = 3.
     T = 30.
     t1 = T / 4
+    error_rate = 0.000000025  # errors per cycle
 
     # Es = []
     # Bs = np.linspace(0,3,100)
@@ -46,6 +65,20 @@ if __name__ == '__main__':
     #     Es.append(get_translationally_invariant_spectrum(J=J,h=h,k=0,g=0,B=B))
     # plt.plot(Bs, Es)
     # plt.show()
+
+
+    smoothed_g = lambda t: get_smoothed_func(t, get_g, T/10) - get_smoothed_func(T, get_g, T/10)
+    smoothed_B = lambda t: get_smoothed_func(t, get_B, T/10) - get_smoothed_func(T, get_B, T/10)
+    ts = np.linspace(0,T,1000)
+    gs = []
+    Bs = []
+    for t in ts:
+        gs.append(smoothed_g(t))
+        Bs.append(smoothed_B(t))
+    plt.plot(ts, gs, label='g')
+    plt.plot(ts, Bs, label='B')
+    plt.legend()
+    plt.show()
 
 
     integration_params = dict(name='vode', nsteps=20000, rtol=1e-8, atol=1e-12)
@@ -76,8 +109,8 @@ if __name__ == '__main__':
     hamiltonian.add_term(name='h', strength=h, sublattice1=3, sublattice2=0, site_offset=0)
     hamiltonian.add_term(name='J', strength=-J, sublattice1=3, sublattice2=0, site_offset=1,
                          gauge_field=S, gauge_sublattice1=2, gauge_sublattice2=1, gauge_site_offset=1)
-    hamiltonian.add_term(name='g', strength=-1, sublattice1=4, sublattice2=0, site_offset=0, time_dependence=get_g)
-    hamiltonian.add_term(name='B', strength=-1, sublattice1=4, sublattice2=5, site_offset=0, time_dependence=get_B)
+    hamiltonian.add_term(name='g', strength=-1, sublattice1=4, sublattice2=0, site_offset=0, time_dependence=smoothed_g)
+    hamiltonian.add_term(name='B', strength=-1, sublattice1=4, sublattice2=5, site_offset=0, time_dependence=smoothed_B)
 
     decoupled_hamiltonian_with_gauge = FreeFermionHamiltonian(system_shape)
     decoupled_hamiltonian_with_gauge.add_term(name='h', strength=h, sublattice1=3, sublattice2=0, site_offset=0)
@@ -100,36 +133,80 @@ if __name__ == '__main__':
             errors_effect_gauge[name + '_' + str(i)] = np.any([(sublattice in [1,2]) for sublattice in sublattices.values()])
 
 
-
     Ud = hamiltonian.full_cycle_unitary_faster(integration_params, 0, T)
-    Ud_trotter = hamiltonian.full_cycle_unitary_trotterize(0, T, atol=1e-3)
-    for dt in [1.,0.1,0.01]:
-        hamiltonian.dt = dt
-        Ud_trotter = hamiltonian.full_cycle_unitary_trotterize(0, T)
-        print(np.sum(np.abs(Ud-Ud_trotter)))
+
+    steps_list = np.logspace(0,4,15, dtype=int)
+    errors = []
+    L1_errors = []
+    for steps in steps_list:
+        t0 = time()
+        Ud_trotter = hamiltonian.full_cycle_unitary_trotterize(0, T, steps=steps)
+        tf = time()
+        print(tf - t0)
+        errors.append(np.sum(np.abs(Ud - Ud_trotter)) / np.sum(np.abs(Ud)))
+        L1_errors.append(np.linalg.norm(1j*scipy.linalg.logm(Ud @ Ud_trotter.T.conj()), ord=2))
+    plt.loglog(steps_list, errors, '.')
+    plt.figure()
+    plt.loglog(steps_list, L1_errors, '.')
+    plt.show()
+
+
+    def reset_all_b4b5(S):
+        for i in range(num_sites):
+            S.reset(4, 5, i, i)
+
 
     Es = []
-    Fs = []
-    for _ in range(50):
-        if np.random.rand() < 0.1:
+    cycle = 0
+    time_to_error = np.random.exponential(T / error_rate)
+    time_in_current_cycle = 0.
+    while True:
+        if cycle == 50:
+            # finished all cycles
+            break
+        elif time_to_error == 0:
+            print('apply error')
             error_name = np.random.choice(list(all_errors_unitaries.keys()))
             S.evolve_with_unitary(all_errors_unitaries[error_name])
             print(error_name)
             if errors_effect_gauge[error_name]:
                 print('recalculating Ud')
                 Ud = hamiltonian.full_cycle_unitary_faster(integration_params, 0, T)
-        S.evolve_with_unitary(Ud)
-        for i in range(num_sites):
-            S.reset(4, 5, i, i)
-        Es.append(S.get_energy(decoupled_hamiltonian_with_gauge.get_matrix()))
-        Fs.append(fidelity(S.matrix, ground_state.matrix))
+            time_to_error = np.random.exponential(T / error_rate)
+        elif time_to_error > T and time_in_current_cycle == 0:
+            print('apply a full cycle unitary')
+            S.evolve_with_unitary(Ud)
+            time_to_error -= T
+            time_in_current_cycle = T
+        elif time_to_error < T - time_in_current_cycle:
+            print('apply a partial unitary until error')
+            Ud_temp = hamiltonian.full_cycle_unitary_faster(integration_params,
+                                                            time_in_current_cycle,
+                                                            time_in_current_cycle + time_to_error)
+            S.evolve_with_unitary(Ud_temp)
+            time_in_current_cycle += time_to_error
+            time_to_error = 0
+        elif time_in_current_cycle == T:
+            print('reset')
+            reset_all_b4b5(S)
+            Es.append(S.get_energy(decoupled_hamiltonian_with_gauge.get_matrix()))
+            cycle += 1
+            time_in_current_cycle = 0
+        elif time_in_current_cycle > 0:
+            print('finish incomplete cycle')
+            Ud_temp = hamiltonian.full_cycle_unitary_faster(integration_params,
+                                                            time_in_current_cycle,
+                                                            T)
+            S.evolve_with_unitary(Ud_temp)
+            time_to_error -= T - time_in_current_cycle
+            time_in_current_cycle = T
+        else:
+            raise 'invalid cycle state'
+
     E_gs = ground_state.get_energy(decoupled_hamiltonian_matrix)
     print(Es[-1])
     print('ground state energy = ' + str(E_gs))
     plt.figure()
     plt.plot(Es)
     plt.plot([E_gs]*len(Es))
-
-    plt.figure()
-    plt.plot(Fs)
     plt.show()

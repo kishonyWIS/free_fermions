@@ -5,10 +5,7 @@ from scipy.linalg import eigh
 from scipy.stats import special_ortho_group
 from scipy.linalg import expm
 from scipy.integrate import solve_ivp
-
-
-# TODO: trotterize
-# TODO: add noise during evolution
+from scipy import sparse
 
 
 def add_to_diag(arr: np.ndarray, to_add: Union[int, list]):
@@ -156,28 +153,32 @@ class HamiltonianTerm:
     def time_independent_matrix(self) -> np.ndarray:
         return tensor_to_matrix(self.time_independent_tensor, self.system_shape)
 
-    def small_unitary(self, t) -> np.ndarray:
-        small_U = np.eye(get_system_matrix_shape(self.system_shape)[0])
+    def small_unitary(self, t, dt_factor=1) -> sparse.csr_matrix:
+        matrix_shape = get_system_matrix_shape(self.system_shape)[0]
         time_dependence = 1 if self.time_dependence is None else self.time_dependence(t)
-        small_U_2by2 = expm(np.array([[0, 2], [-2, 0]]) * self.strength * time_dependence * self.dt)
+        cos = np.cos(2*self.strength * time_dependence * self.dt * dt_factor)
+        sin = np.sin(2*self.strength * time_dependence * self.dt * dt_factor)
+        # small_U_2by2 = np.array([[cos, sin], [-sin, cos]])
+        # small_U_2by2 = expm(np.array([[0, 2], [-2, 0]]) * self.strength * time_dependence * self.dt)
         if self.site1 is not None and self.site2 is not None:
             i1 = site_and_sublattice_to_flat_index(self.site1, self.sublattice1, self.system_shape)
             i2 = site_and_sublattice_to_flat_index(self.site2, self.sublattice2, self.system_shape)
             small_U[np.ix_([i1,i2],[i1,i2])] = small_U_2by2
         elif self.site_offset is not None:
-            for site1 in range(self.system_shape[0] - self.site_offset):
-                site2 = site1 + self.site_offset
-                i1 = site_and_sublattice_to_flat_index(site1, self.sublattice1, self.system_shape)
-                i2 = site_and_sublattice_to_flat_index(site2, self.sublattice2, self.system_shape)
-                if self.gauge_field is None:
-                    small_U[np.ix_([i1, i2], [i1, i2])] = small_U_2by2
-                else:
-                    gauge = self.gauge_field.tensor[site1, self.gauge_sublattice1,
-                                                    site1+self.gauge_site_offset, self.gauge_sublattice2]
-                    if gauge > 0:
-                        small_U[np.ix_([i1, i2], [i1, i2])] = small_U_2by2
-                    else:
-                        small_U[np.ix_([i1, i2], [i1, i2])] = small_U_2by2.T
+            diag_terms = np.ones(matrix_shape)
+            diag_terms[np.arange(self.sublattice1, matrix_shape - self.system_shape[1]*self.site_offset, self.system_shape[1])] = cos
+            diag_terms[np.arange(self.sublattice2 + self.system_shape[1]*self.site_offset, matrix_shape, self.system_shape[1])] = cos
+            upper_diag_offset = self.sublattice2 - self.sublattice1 + self.system_shape[1]*self.site_offset
+            upper_diag_length = matrix_shape - abs(upper_diag_offset)
+            upper_terms = np.zeros(upper_diag_length)
+            if self.gauge_field is None:
+                gauge = 1
+            else:
+                gauge = np.diag(self.gauge_field.tensor[:self.system_shape[0] - self.gauge_site_offset,
+                                self.gauge_sublattice1, self.gauge_site_offset:, self.gauge_sublattice2])
+            upper_terms[np.arange(min(self.sublattice1, self.sublattice2 + self.system_shape[1]*self.site_offset), upper_diag_length, self.system_shape[1])] = sin * gauge
+            small_U = sparse.diags([diag_terms, upper_terms, -upper_terms],
+                                   offsets=[0, upper_diag_offset, -upper_diag_offset], format='csr')
         return small_U
 
     def apply_time_dependence(self, arr: np.ndarray, t: float = None) -> np.ndarray:
@@ -274,16 +275,16 @@ class FreeFermionHamiltonian:
         return self.evolve_single_fermion_ivp(c_basis, integration_params=integration_params, t0=t0, tf=tf).reshape(
             self.system_shape[0] * self.system_shape[1], self.system_shape[0] * self.system_shape[1])
 
-    def full_cycle_unitary_trotterize(self, t0: float, tf: float, dt: Optional[float] = None, atol: Optional[float] = None) -> np.ndarray:
+    def full_cycle_unitary_trotterize(self, t0: float, tf: float, steps: Optional[float] = None, atol: Optional[float] = None) -> np.ndarray:
         if atol is None:
-            if dt is not None:
-                self.dt = dt
+            if steps is not None:
+                self.dt = (tf-t0)/steps
             Ud = self._full_cycle_unitary_trotterize_run(t0, tf)
         else:
-            if dt is not None:
-                self.dt = dt
+            if steps is not None:
+                self.dt = (tf-t0)/steps
             else:
-                self.dt = 1.
+                self.dt = (tf-t0)/100
             Ud_prev = np.full((self.system_shape[0] * self.system_shape[1],
                                self.system_shape[0] * self.system_shape[1]), 100)
             relative_error = np.inf
@@ -296,9 +297,22 @@ class FreeFermionHamiltonian:
 
     def _full_cycle_unitary_trotterize_run(self, t0, tf):
         Ud = np.eye(self.system_shape[0] * self.system_shape[1])
-        for t in np.arange(0, int((tf - t0) / self.dt) + 1) * self.dt + t0:
-            for term in self.terms.values():
-                Ud = term.small_unitary(t) @ Ud
+        for t in np.arange(0, int((tf - t0) / self.dt)) * self.dt + t0:
+            Ud = self._unitary_trotterize_run_step_second_trotter_only_for_1dtfim(Ud, t)
+            # Ud = self._unitary_trotterize_run_step(Ud, t)
+        return Ud
+
+    def _unitary_trotterize_run_step(self, Ud, t):
+        for term in self.terms.values():
+            Ud = term.small_unitary(t + self.dt / 2) @ Ud
+        return Ud
+
+    def _unitary_trotterize_run_step_second_trotter_only_for_1dtfim(self, Ud, t):
+        e_J_2 = self.terms['J'].small_unitary(t + self.dt / 2, dt_factor=0.5)
+        e_B_2 = self.terms['B'].small_unitary(t + self.dt / 2, dt_factor=0.5)
+        e_h_2 = self.terms['h'].small_unitary(t + self.dt / 2, dt_factor=0.5)
+        e_g = self.terms['g'].small_unitary(t + self.dt / 2)
+        Ud = e_J_2 @ e_B_2 @ e_h_2 @ e_g @ e_h_2 @ e_B_2 @ e_J_2 @ Ud
         return Ud
 
     def get_ground_state(self, t: float = None) -> SingleParticleDensityMatrix:
