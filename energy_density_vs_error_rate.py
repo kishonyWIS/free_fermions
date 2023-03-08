@@ -2,7 +2,6 @@ import numpy as np
 from matplotlib import pyplot as plt
 import pandas as pd
 
-from free_fermion_hamiltonian import get_fermion_bilinear_unitary
 from one_d_ising import get_smoothed_func, get_g, get_B, get_TFI_model
 np.random.seed(0)
 
@@ -59,18 +58,19 @@ integration_params = dict(name='vode', nsteps=20000, rtol=1e-8, atol=1e-12)
 
 
 trotter_steps = 100
-cycles = 40000
+cycles = 100
 errors_per_cycle_per_qubit = np.linspace(1e-10, 0.02, 10)
 errors_per_cycle = errors_per_cycle_per_qubit * num_sites * 2
 hs = [0.5, 1]
 Js = [1, 0.5]
+periodic_bc = True
 
 columns = ["Ns", "periodic_bc", "drop_one_g_for_odd_bath_signs", "J", "h", "V", "Nt", "N_iter", "errors_per_cycle_per_qubit", "energy_density", "energy_density_std"];
 results_df = pd.DataFrame(columns=columns)
 
 for i_h_J, (h, J) in enumerate(zip(hs, Js)):
     hamiltonian, S, decoupled_hamiltonian_with_gauge, E_gs, all_errors_unitaries, errors_effect_gauge = \
-        get_TFI_model(num_sites, h, J, smoothed_g, smoothed_B)
+        get_TFI_model(num_sites, h, J, smoothed_g, smoothed_B, periodic_bc=periodic_bc)
     Ud = hamiltonian.full_cycle_unitary_trotterize(0, T, steps=trotter_steps)
     average_Es = []
     for error_rate in errors_per_cycle_per_qubit:
@@ -136,7 +136,7 @@ for i_h_J, (h, J) in enumerate(zip(hs, Js)):
         plt.plot(Es)
         plt.plot([E_gs]*len(Es))
 
-        new_row = pd.DataFrame({'Ns': num_sites, 'periodic_bc': False, 'drop_one_g_for_odd_bath_signs': False, 'J': J,
+        new_row = pd.DataFrame({'Ns': num_sites, 'periodic_bc': periodic_bc, 'drop_one_g_for_odd_bath_signs': False, 'J': J,
                                 'h': h, 'V': 0, 'Nt': trotter_steps, 'N_iter': cycles,
                                 'errors_per_cycle_per_qubit': error_rate, 'energy_density': (np.mean(Es[2:]) - E_gs) / num_sites,
                                 'energy_density_std': np.std(Es[2:]) / num_sites / np.sqrt(cycles)},
@@ -153,5 +153,5 @@ plt.ylabel('Energy density', fontsize='20')
 plt.tick_params(axis='both', which='major', labelsize=15)
 plt.legend(fontsize=15)
 plt.tight_layout()
-plt.savefig(f'graphs/energy_vs_error_rate_steps_{trotter_steps}_cycles_{cycles}_sites_{num_sites}.pdf')
+# plt.savefig(f'graphs/energy_vs_error_rate_steps_{trotter_steps}_cycles_{cycles}_sites_{num_sites}.pdf')
 plt.show()

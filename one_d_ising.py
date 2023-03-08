@@ -58,7 +58,7 @@ class TransverseFieldIsingState(SingleParticleDensityMatrix):
             self.reset(4, 5, i, i)
 
 
-def get_TFI_model(num_sites, h, J, g, B, initial_state = 'random'):
+def get_TFI_model(num_sites, h, J, g, B, initial_state = 'random', periodic_bc=False):
     num_sublattices = 6
     system_shape = (num_sites, num_sublattices, num_sites, num_sublattices)
     non_gauge_shape = (num_sites, 4, num_sites, 4)
@@ -68,7 +68,7 @@ def get_TFI_model(num_sites, h, J, g, B, initial_state = 'random'):
 
     decoupled_hamiltonian = TransverseFieldIsingHamiltonian(system_shape)
     decoupled_hamiltonian.add_term(name='h', strength=h, sublattice1=3, sublattice2=0, site_offset=0)
-    decoupled_hamiltonian.add_term(name='J', strength=-J, sublattice1=3, sublattice2=0, site_offset=1)
+    decoupled_hamiltonian.add_term(name='J', strength=-J, sublattice1=3, sublattice2=0, site_offset=1, periodic_bc=periodic_bc)
     decoupled_hamiltonian_matrix = decoupled_hamiltonian.get_matrix()
     ground_state = decoupled_hamiltonian.get_ground_state()
     S0_tensor = np.zeros(system_shape)
@@ -82,7 +82,7 @@ def get_TFI_model(num_sites, h, J, g, B, initial_state = 'random'):
         S0_tensor[non_gauge_idxs] = S_non_gauge.tensor[non_gauge_idxs]
 
     gauge_setting_hamiltonian = TransverseFieldIsingHamiltonian(system_shape)
-    gauge_setting_hamiltonian.add_term(name='G', strength=-1, sublattice1=2, sublattice2=1, site_offset=1)
+    gauge_setting_hamiltonian.add_term(name='G', strength=-1, sublattice1=2, sublattice2=1, site_offset=1, periodic_bc=periodic_bc)
     S_gauge = gauge_setting_hamiltonian.get_ground_state()
     S0_tensor[gauge_idxs] = S_gauge.tensor[gauge_idxs]
     S = TransverseFieldIsingState(system_shape=system_shape, tensor=S0_tensor)
@@ -90,14 +90,14 @@ def get_TFI_model(num_sites, h, J, g, B, initial_state = 'random'):
     hamiltonian = TransverseFieldIsingHamiltonian(system_shape, dt=1.)
     hamiltonian.add_term(name='h', strength=h, sublattice1=3, sublattice2=0, site_offset=0)
     hamiltonian.add_term(name='J', strength=-J, sublattice1=3, sublattice2=0, site_offset=1,
-                         gauge_field=S, gauge_sublattice1=2, gauge_sublattice2=1, gauge_site_offset=1)
+                         gauge_field=S, gauge_sublattice1=2, gauge_sublattice2=1, gauge_site_offset=1, periodic_bc=periodic_bc)
     hamiltonian.add_term(name='g', strength=-1, sublattice1=4, sublattice2=0, site_offset=0, time_dependence=g)
     hamiltonian.add_term(name='B', strength=-1, sublattice1=4, sublattice2=5, site_offset=0, time_dependence=B)
     decoupled_hamiltonian_with_gauge = TransverseFieldIsingHamiltonian(system_shape)
     decoupled_hamiltonian_with_gauge.add_term(name='h', strength=h, sublattice1=3, sublattice2=0, site_offset=0)
     decoupled_hamiltonian_with_gauge.add_term(name='J', strength=-J, sublattice1=3, sublattice2=0, site_offset=1,
                                               gauge_field=S, gauge_sublattice1=2, gauge_sublattice2=1,
-                                              gauge_site_offset=1)
+                                              gauge_site_offset=1, periodic_bc=periodic_bc)
     E_gs = ground_state.get_energy(decoupled_hamiltonian_matrix)
 
     spin_to_fermion_sublattices = {'tau_x': {'sublattice1': 4, 'sublattice2': 0},

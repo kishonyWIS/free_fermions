@@ -97,7 +97,8 @@ class HamiltonianTerm:
                  gauge_sublattice1: Optional[int] = None,
                  gauge_sublattice2: Optional[int] = None,
                  gauge_site_offset: Union[int, tuple[int]] = None,
-                 dt: float = None):
+                 dt: float = None,
+                 periodic_bc = False):
         self.system_shape = system_shape
         self.site_offset = site_offset
         self.sublattice1 = sublattice1
@@ -110,6 +111,7 @@ class HamiltonianTerm:
         self.gauge_sublattice2 = gauge_sublattice2
         self.gauge_site_offset = gauge_site_offset
         self.dt = dt
+        self.periodic_bc = periodic_bc
         self.strength = strength
 
     @property
@@ -133,6 +135,16 @@ class HamiltonianTerm:
                 add_to_diag(
                     self._time_independent_tensor[self.site_offset:, self.sublattice2, :self.system_shape[2] - self.site_offset,
                     self.sublattice1], -2 * self._strength)
+                if self.periodic_bc:
+                    add_to_diag(
+                        self._time_independent_tensor[self.system_shape[0] - self.site_offset:, self.sublattice1,
+                        :self.site_offset,
+                        self.sublattice2], 2 * self._strength)
+                    add_to_diag(
+                        self._time_independent_tensor[:self.site_offset, self.sublattice2,
+                        self.system_shape[2] - self.site_offset:,
+                        self.sublattice1], -2 * self._strength)
+
 
     @property
     def time_independent_tensor(self) -> np.ndarray:
@@ -149,6 +161,19 @@ class HamiltonianTerm:
                 :self.system_shape[2] - self.site_offset, self.sublattice1],
                 -2 * self._strength * np.diag(self.gauge_field.tensor[:self.system_shape[0] - self.gauge_site_offset,
                                       self.gauge_sublattice1, self.gauge_site_offset:, self.gauge_sublattice2]))
+            if self.periodic_bc:
+                add_to_diag(
+                    self._time_independent_tensor[self.system_shape[0] - self.site_offset:, self.sublattice1,
+                    :self.site_offset, self.sublattice2],
+                    2 * self._strength * np.diag(self.gauge_field.tensor[self.system_shape[0] - self.gauge_site_offset:,
+                                                 self.gauge_sublattice1, :self.gauge_site_offset,
+                                                 self.gauge_sublattice2]))
+                add_to_diag(
+                    self._time_independent_tensor[:self.site_offset, self.sublattice2,
+                    self.system_shape[2] - self.site_offset:, self.sublattice1],
+                    -2 * self._strength * np.diag(
+                        self.gauge_field.tensor[self.system_shape[0] - self.gauge_site_offset:,
+                        self.gauge_sublattice1, :self.gauge_site_offset, self.gauge_sublattice2]))
         return self._time_independent_tensor
 
     @property
@@ -179,9 +204,27 @@ class HamiltonianTerm:
             else:
                 gauge = np.diag(self.gauge_field.tensor[:self.system_shape[0] - self.gauge_site_offset,
                                 self.gauge_sublattice1, self.gauge_site_offset:, self.gauge_sublattice2])
-            upper_terms[np.arange(min(self.sublattice1, self.sublattice2 + self.system_shape[1]*self.site_offset), upper_diag_length, self.system_shape[1])] = sin * gauge
-            small_U = sparse.diags([diag_terms, upper_terms, -upper_terms],
-                                   offsets=[0, upper_diag_offset, -upper_diag_offset], format='csr')
+            upper_terms_indexes = np.arange(min(self.sublattice1, self.sublattice2 + self.system_shape[1]*self.site_offset), matrix_shape, self.system_shape[1])
+            upper_terms[upper_terms_indexes[upper_terms_indexes<upper_diag_length]] = sin * gauge
+            if not self.periodic_bc:
+                small_U = sparse.diags([diag_terms, upper_terms, -upper_terms],
+                                       offsets=[0, upper_diag_offset, -upper_diag_offset], format='csr')
+            else:
+                diag_terms[np.arange(self.sublattice1 + matrix_shape - self.system_shape[1] * self.site_offset, matrix_shape,
+                                     self.system_shape[1])] = cos
+                diag_terms[np.arange(self.sublattice2, self.system_shape[1]*self.site_offset,
+                                     self.system_shape[1])] = cos
+                upper_diag_offset_periodic = -np.sign(upper_diag_offset)*(matrix_shape - abs(upper_diag_offset))
+                upper_diag_length_periodic = matrix_shape - abs(upper_diag_offset_periodic)
+                upper_terms_periodic = np.zeros(upper_diag_length_periodic)
+                if self.gauge_field is None:
+                    gauge = 1
+                else:
+                    gauge = np.diag(self.gauge_field.tensor[self.system_shape[0] - self.gauge_site_offset:,
+                                    self.gauge_sublattice1, :self.gauge_site_offset, self.gauge_sublattice2])
+                upper_terms_periodic[upper_terms_indexes[(upper_terms_indexes>=upper_diag_length)] - upper_diag_length] = sin * gauge
+                small_U = sparse.diags([diag_terms, upper_terms, -upper_terms, upper_terms_periodic, -upper_terms_periodic],
+                                       offsets=[0, upper_diag_offset, -upper_diag_offset, upper_diag_offset_periodic, -upper_diag_offset_periodic], format='csr')
         return small_U
 
     def apply_time_dependence(self, arr: np.ndarray, t: float = None) -> np.ndarray:
