@@ -75,6 +75,8 @@ class SingleParticleDensityMatrix:
         flat_idx2 = site_and_sublattice_to_flat_index(site2, sublattice2, self.system_shape)
         self._matrix[:, [flat_idx1, flat_idx2]] = 0
         self._matrix[[flat_idx1, flat_idx2], :] = 0
+        # NOTE: there should be 1j on the diagonal (at all times) but having it be zero instead allows the matrix to be
+        # real and does not effect further time evolution or resets.
         self._matrix[np.ix_([flat_idx1, flat_idx2], [flat_idx1, flat_idx2])] = np.array([[0, 1], [-1, 0]])
 
     def get_energy(self, hamiltonian_matrix: np.ndarray):
@@ -158,11 +160,12 @@ class HamiltonianTerm:
         time_dependence = 1 if self.time_dependence is None else self.time_dependence(t)
         cos = np.cos(2*self.strength * time_dependence * self.dt * dt_factor)
         sin = np.sin(2*self.strength * time_dependence * self.dt * dt_factor)
-        # small_U_2by2 = np.array([[cos, sin], [-sin, cos]])
-        # small_U_2by2 = expm(np.array([[0, 2], [-2, 0]]) * self.strength * time_dependence * self.dt)
         if self.site1 is not None and self.site2 is not None:
             i1 = site_and_sublattice_to_flat_index(self.site1, self.sublattice1, self.system_shape)
             i2 = site_and_sublattice_to_flat_index(self.site2, self.sublattice2, self.system_shape)
+            small_U_2by2 = np.array([[cos, sin], [-sin, cos]])
+            # small_U_2by2 = expm(np.array([[0, 2], [-2, 0]]) * self.strength * time_dependence * self.dt)
+            small_U = sparse.eye(self.system_shape[0] * self.system_shape[1], format='lil')
             small_U[np.ix_([i1,i2],[i1,i2])] = small_U_2by2
         elif self.site_offset is not None:
             diag_terms = np.ones(matrix_shape)
@@ -298,21 +301,12 @@ class FreeFermionHamiltonian:
     def _full_cycle_unitary_trotterize_run(self, t0, tf):
         Ud = np.eye(self.system_shape[0] * self.system_shape[1])
         for t in np.arange(0, int((tf - t0) / self.dt)) * self.dt + t0:
-            Ud = self._unitary_trotterize_run_step_second_trotter_only_for_1dtfim(Ud, t)
-            # Ud = self._unitary_trotterize_run_step(Ud, t)
+            Ud = self._unitary_trotterize_run_step(Ud, t)
         return Ud
 
     def _unitary_trotterize_run_step(self, Ud, t):
         for term in self.terms.values():
             Ud = term.small_unitary(t + self.dt / 2) @ Ud
-        return Ud
-
-    def _unitary_trotterize_run_step_second_trotter_only_for_1dtfim(self, Ud, t):
-        e_J_2 = self.terms['J'].small_unitary(t + self.dt / 2, dt_factor=0.5)
-        e_B_2 = self.terms['B'].small_unitary(t + self.dt / 2, dt_factor=0.5)
-        e_h_2 = self.terms['h'].small_unitary(t + self.dt / 2, dt_factor=0.5)
-        e_g = self.terms['g'].small_unitary(t + self.dt / 2)
-        Ud = e_J_2 @ e_B_2 @ e_h_2 @ e_g @ e_h_2 @ e_B_2 @ e_J_2 @ Ud
         return Ud
 
     def get_ground_state(self, t: float = None) -> SingleParticleDensityMatrix:
@@ -323,10 +317,10 @@ class FreeFermionHamiltonian:
 
 
 def get_fermion_bilinear_unitary(system_shape: tuple[int,...],
-                                 sublattice1: int, sublattice2: int, site1: int, site2: int, integration_params: dict):
-    H = FreeFermionHamiltonian(system_shape)
-    H.add_term(name='fermion_bilinear', strength=1, sublattice1=sublattice1, sublattice2=sublattice2, site1=site1, site2=site2)
-    return H.full_cycle_unitary(integration_params, 0, np.pi / 2)
+                                 sublattice1: int, sublattice2: int, site1: int, site2: int):
+    term = HamiltonianTerm(system_shape=system_shape, strength=1, sublattice1=sublattice1, sublattice2=sublattice2,
+                           site1=site1, site2=site2, dt=np.pi/2)
+    return term.small_unitary(0)
 
 
 def fidelity(rho1,rho2):
