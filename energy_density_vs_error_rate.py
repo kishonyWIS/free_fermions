@@ -5,7 +5,7 @@ import pandas as pd
 from one_d_ising import get_smoothed_func, get_g, get_B, get_TFI_model
 np.random.seed(0)
 
-num_sites = 8
+num_sites = 2
 g0 = 0.5
 B1 = 0.
 B0 = 3.
@@ -25,16 +25,16 @@ smoothed_B_before_zeroing = lambda t: get_smoothed_func(t, lambda tt: get_B(tt, 
 smoothed_g = lambda t: smoothed_g_before_zeroing(t) - smoothed_g_before_zeroing(T)
 smoothed_B = lambda t: smoothed_B_before_zeroing(t) - smoothed_B_before_zeroing(T)
 
-ts = np.linspace(0,T,1000)
-gs = []
-Bs = []
-for t in ts:
-    gs.append(smoothed_g(t))
-    Bs.append(smoothed_B(t))
-plt.plot(ts, gs, label='g')
-plt.plot(ts, Bs, label='B')
-plt.legend()
-plt.show()
+# ts = np.linspace(0,T,1000)
+# gs = []
+# Bs = []
+# for t in ts:
+#     gs.append(smoothed_g(t))
+#     Bs.append(smoothed_B(t))
+# plt.plot(ts, gs, label='g')
+# plt.plot(ts, Bs, label='B')
+# plt.legend()
+# plt.show()
 
 
 integration_params = dict(name='vode', nsteps=20000, rtol=1e-8, atol=1e-12)
@@ -58,8 +58,8 @@ integration_params = dict(name='vode', nsteps=20000, rtol=1e-8, atol=1e-12)
 
 
 trotter_steps = 100
-cycles = 100
-errors_per_cycle_per_qubit = np.linspace(1e-10, 0.02, 10)
+cycles = 50
+errors_per_cycle_per_qubit = [1e-10, 2e-2] #np.linspace(1e-10, 0.02, 10)
 errors_per_cycle = errors_per_cycle_per_qubit * num_sites * 2
 hs = [0.5, 1]
 Js = [1, 0.5]
@@ -70,7 +70,7 @@ results_df = pd.DataFrame(columns=columns)
 
 for i_h_J, (h, J) in enumerate(zip(hs, Js)):
     hamiltonian, S, decoupled_hamiltonian_with_gauge, E_gs, all_errors_unitaries, errors_effect_gauge = \
-        get_TFI_model(num_sites, h, J, smoothed_g, smoothed_B, periodic_bc=periodic_bc)
+        get_TFI_model(num_sites, h, J, smoothed_g, smoothed_B, initial_state='ground', periodic_bc=periodic_bc)
     Ud = hamiltonian.full_cycle_unitary_trotterize(0, T, steps=trotter_steps)
     average_Es = []
     for error_rate in errors_per_cycle_per_qubit:
