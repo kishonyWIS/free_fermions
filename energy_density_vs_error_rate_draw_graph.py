@@ -9,7 +9,7 @@ simulation_mode = "stochastic_schrodinger" #"stochastic_schrodinger" "single_par
 trotter_steps = 100
 cycles = 1000
 num_sites = 8
-V = 0.5
+V = 0.1
 
 if simulation_mode == "stochastic_schrodinger":
     results_df = pd.read_csv("/Users/giladkishony/Dropbox/GILAD/Keva/phd/quantum computation/Periodic Unitaries and Measurements/TestCode/results_energy_density_vs_error_rate.csv")

@@ -8,8 +8,8 @@ import pandas as pd
 trotter_steps = 100
 num_sites = 8
 V = 0.0
-J = 1.0
-h = 0.5
+J = 0.5
+h = 1.0
 
 results_df = pd.read_csv("/Users/giladkishony/Dropbox/GILAD/Keva/phd/quantum computation/Periodic Unitaries and Measurements/TestCode/results_energy_density_single_time_trace.csv")
 
@@ -22,7 +22,7 @@ with sns.axes_style("whitegrid"):
     ax.set_xlabel('Cycle', fontsize='20', fontname='Times New Roman')
     # ax.set_ylabel("Energy density", color="blue", fontsize='20', fontname='Times New Roman')
     ax.legend(prop=mpl.font_manager.FontProperties(family='Times New Roman', size=15), loc='upper left')
-    plt.ylim([5e-4, 1e0])
+    plt.ylim([8e-4, 8e-1])
 
     ax2 = ax.twinx()
     ax2.plot(results_df.cycle, results_df.bath_parity, linestyle='--', label=f'Bath parity', color="red")

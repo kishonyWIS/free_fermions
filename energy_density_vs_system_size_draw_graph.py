@@ -8,9 +8,9 @@ import numpy as np
 
 trotter_steps = 100
 cycles = 1000
-J = 1.0
-h = 0.5
-V = 0.5
+J = 0.5
+h = 1.0
+V = 0.1
 
 results_df = pd.read_csv("/Users/giladkishony/Dropbox/GILAD/Keva/phd/quantum computation/Periodic Unitaries and Measurements/TestCode/results_energy_density_vs_system_size.csv")
 
