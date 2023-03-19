@@ -16,14 +16,14 @@ results_df['h_minus_J'] = results_df.h-results_df.J
 results_df = results_df[['h_minus_J', 'energies', 'V']]
 
 markers = itertools.cycle(['o', 's', '^', '*', '8', 'p', 'd', 'v'])
-colors = itertools.cycle(['b', 'r'])
+colors = itertools.cycle(['b', 'r', 'g'])
 
 with sns.axes_style("whitegrid"):
     plt.rcParams["font.family"] = "Times New Roman"
 
     groups_V = results_df.groupby(["V"])
     for V, group_V in groups_V:
-        fig, ax = plt.subplots()
+        fig, ax = plt.subplots(num=f"V={V}")
         marker = next(markers)
         color = next(colors)
         energies_groups = group_V.groupby('h_minus_J').energies.apply(np.array)
