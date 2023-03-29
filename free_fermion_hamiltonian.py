@@ -358,6 +358,11 @@ class FreeFermionHamiltonian:
         S = 1j * Q @ np.diag(np.sign(e)) @ Q.conj().T
         return SingleParticleDensityMatrix(system_shape=self.system_shape, matrix=S)
 
+    def get_excitation_spectrum(self, t: float = None) -> np.ndarray:
+        M = self.get_matrix(t)
+        e,_ = eigh(1j*M)
+        return e
+
 
 def get_fermion_bilinear_unitary(system_shape: tuple[int,...],
                                  sublattice1: int, sublattice2: int, site1: int, site2: int):
