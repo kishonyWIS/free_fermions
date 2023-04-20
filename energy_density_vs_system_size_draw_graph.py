@@ -8,9 +8,9 @@ import numpy as np
 
 trotter_steps = 100
 cycles = 1000
-J = 0.5
-h = 1.0
-V = 0.0
+J = 1.0
+h = 0.5
+V = 0.1
 
 results_df = pd.read_csv("/Users/giladkishony/Dropbox/GILAD/Keva/phd/quantum computation/Periodic Unitaries and Measurements/TestCode/results_energy_density_vs_system_size_first_excitation.csv")
 
@@ -32,7 +32,7 @@ with sns.axes_style("whitegrid"):
         yerr = np.array(group.energy_density_std)
         yerr[yerr > group.energy_density] = 0.9999 * group.energy_density[yerr > group.energy_density]
         plt.errorbar(group.Ns, group.energy_density, yerr=yerr, linestyle='-', marker=marker, color=color,
-                     label=f'{errors_per_cycle_per_qubit} errors per cycle per qubit')
+                     label=errors_per_cycle_per_qubit)
         yerr = np.array(group.energy_density_std_first_excited_state)
         yerr[yerr > group.energy_density_first_excited_state] = 0.9999 * group.energy_density_first_excited_state[yerr > group.energy_density_first_excited_state]
         plt.errorbar(group.Ns, group.energy_density_first_excited_state, yerr=yerr, linestyle='--', marker=marker, color=color)
@@ -40,7 +40,9 @@ with sns.axes_style("whitegrid"):
     plt.xlabel('System size', fontsize='20', fontname='Times New Roman')#, fontweight='bold')
     plt.ylabel('Energy density', fontsize='20', fontname='Times New Roman')#, fontweight='bold')
     plt.tick_params(axis='both', which='major', labelsize=15)
-    plt.legend(prop=mpl.font_manager.FontProperties(family='Times New Roman', size=15))
+    l = plt.legend(prop=mpl.font_manager.FontProperties(family='Times New Roman', size=15), ncol=2)
+    l.set_title(title='errors per cycle per qubit',
+                prop=mpl.font_manager.FontProperties(family='Times New Roman', size=18))
     plt.tight_layout()
     plt.savefig(f'graphs/energy_vs_system_size_steps_{trotter_steps}_cycles_{cycles}_J_{J}_h_{h}_V_{V}.pdf')
     plt.show()

@@ -4,7 +4,7 @@ from typing import Callable
 import numpy as np
 import scipy
 
-from free_fermion_hamiltonian import FreeFermionHamiltonian, SingleParticleDensityMatrix, get_fermion_bilinear_unitary
+from free_fermion_hamiltonian import MajoranaFreeFermionHamiltonian, MajoranaSingleParticleDensityMatrix, get_fermion_bilinear_unitary
 from scipy.linalg import eigh
 from matplotlib import pyplot as plt
 
@@ -42,7 +42,7 @@ def get_translationally_invariant_spectrum(J, h, k, g, B):
     return E
 
 
-class TransverseFieldIsingModel(FreeFermionHamiltonian):
+class TransverseFieldIsingModel(MajoranaFreeFermionHamiltonian):
     non_gauge_sublattices = [0, 3, 4, 5]
     gauge_sublattices = [1, 2]
     num_non_gauge_sublattices = len(non_gauge_sublattices)
@@ -101,7 +101,7 @@ if __name__ == '__main__':
 
     integration_params = dict(name='vode', nsteps=20000, rtol=1e-8, atol=1e-12)
 
-    decoupled_hamiltonian = FreeFermionHamiltonian(system_shape)
+    decoupled_hamiltonian = MajoranaFreeFermionHamiltonian(system_shape)
     decoupled_hamiltonian.add_term(name='h', strength=h, sublattice1=3, sublattice2=0, site_offset=0)
     decoupled_hamiltonian.add_term(name='J', strength=-J, sublattice1=3, sublattice2=0, site_offset=1)
     decoupled_hamiltonian_matrix = decoupled_hamiltonian.get_matrix()
@@ -109,28 +109,28 @@ if __name__ == '__main__':
 
     S0_tensor = np.zeros(system_shape)
 
-    S_non_gauge = SingleParticleDensityMatrix(non_gauge_shape)
+    S_non_gauge = MajoranaSingleParticleDensityMatrix(non_gauge_shape)
     S_non_gauge.randomize()
     S0_tensor[non_gauge_idxs] = S_non_gauge.tensor
     # S_non_gauge = decoupled_hamiltonian.get_ground_state()
     # S0_tensor[non_gauge_idxs] = S_non_gauge.tensor[non_gauge_idxs]
 
-    gauge_setting_hamiltonian = FreeFermionHamiltonian(system_shape)
+    gauge_setting_hamiltonian = MajoranaFreeFermionHamiltonian(system_shape)
     gauge_setting_hamiltonian.add_term(name='G', strength=-1, sublattice1=2, sublattice2=1, site_offset=1)
     S_gauge = gauge_setting_hamiltonian.get_ground_state()
     S0_tensor[gauge_idxs] = S_gauge.tensor[gauge_idxs]
-    S = SingleParticleDensityMatrix(system_shape=system_shape, tensor=S0_tensor)
+    S = MajoranaSingleParticleDensityMatrix(system_shape=system_shape, tensor=S0_tensor)
     for i in range(num_sites):
         S.reset(4, 5, i, i)
 
-    hamiltonian = FreeFermionHamiltonian(system_shape, dt=1.)
+    hamiltonian = MajoranaFreeFermionHamiltonian(system_shape, dt=1.)
     hamiltonian.add_term(name='h', strength=h, sublattice1=3, sublattice2=0, site_offset=0)
     hamiltonian.add_term(name='J', strength=-J, sublattice1=3, sublattice2=0, site_offset=1,
                          gauge_field=S, gauge_sublattice1=2, gauge_sublattice2=1, gauge_site_offset=1)
     hamiltonian.add_term(name='g', strength=-1, sublattice1=4, sublattice2=0, site_offset=0, time_dependence=smoothed_g)
     hamiltonian.add_term(name='B', strength=-1, sublattice1=4, sublattice2=5, site_offset=0, time_dependence=smoothed_B)
 
-    decoupled_hamiltonian_with_gauge = FreeFermionHamiltonian(system_shape)
+    decoupled_hamiltonian_with_gauge = MajoranaFreeFermionHamiltonian(system_shape)
     decoupled_hamiltonian_with_gauge.add_term(name='h', strength=h, sublattice1=3, sublattice2=0, site_offset=0)
     decoupled_hamiltonian_with_gauge.add_term(name='J', strength=-J, sublattice1=3, sublattice2=0, site_offset=1,
                                               gauge_field=S, gauge_sublattice1=2, gauge_sublattice2=1,

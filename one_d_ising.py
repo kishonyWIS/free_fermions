@@ -4,7 +4,7 @@ from typing import Callable
 import numpy as np
 import scipy
 
-from free_fermion_hamiltonian import FreeFermionHamiltonian, SingleParticleDensityMatrix, get_fermion_bilinear_unitary
+from free_fermion_hamiltonian import MajoranaFreeFermionHamiltonian, MajoranaSingleParticleDensityMatrix, get_fermion_bilinear_unitary
 from scipy.linalg import eigh
 from matplotlib import pyplot as plt
 
@@ -42,7 +42,7 @@ def get_translationally_invariant_spectrum(J, h, k, g, B):
     return E
 
 
-class TransverseFieldIsingHamiltonian(FreeFermionHamiltonian):
+class TransverseFieldIsingHamiltonian(MajoranaFreeFermionHamiltonian):
     def _unitary_trotterize_run_step(self, Ud, t):
         e_J_2 = self.terms['J'].small_unitary(t + self.dt / 2, dt_factor=0.5)
         e_B_2 = self.terms['B'].small_unitary(t + self.dt / 2, dt_factor=0.5)
@@ -52,7 +52,7 @@ class TransverseFieldIsingHamiltonian(FreeFermionHamiltonian):
         return Ud
 
 
-class TransverseFieldIsingState(SingleParticleDensityMatrix):
+class TransverseFieldIsingState(MajoranaSingleParticleDensityMatrix):
     def reset_all_tau(self):
         for i in range(self.system_shape[0]):
             self.reset(4, 5, i, i)
