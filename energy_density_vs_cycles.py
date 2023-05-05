@@ -9,7 +9,7 @@ num_sites = 100
 g0 = 0.5
 B1 = 0.
 B0 = 3.
-T = 12.5
+T = 6.25
 t1 = T / 4
 
 trotter_steps = 10000

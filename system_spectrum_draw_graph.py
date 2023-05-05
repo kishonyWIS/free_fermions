@@ -28,7 +28,7 @@ with sns.axes_style("whitegrid"):
         color = next(colors)
         energies_groups = group_V.groupby('h_minus_J').energies.apply(np.array)
         ax.plot(energies_groups.index, np.stack(energies_groups.values), linestyle='--', marker=marker, color=color)
-        plt.xlabel('h-J', fontsize='20', fontname='Times New Roman')
+        plt.xlabel('$h-J$', fontsize='20', fontname='Times New Roman')
         plt.ylabel('Energy', fontsize='20', fontname='Times New Roman')
         ax.tick_params(axis='both', which='major', labelsize=15)
         # ax.legend(prop=mpl.font_manager.FontProperties(family='Times New Roman', size=15))
