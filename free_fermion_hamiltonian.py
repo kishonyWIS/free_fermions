@@ -30,8 +30,8 @@ def get_system_matrix_shape(system_shape: tuple[int, ...]):
     return shape1, shape2
 
 
-def site_and_sublattice_to_flat_index(site: int, sublattice: int, system_shape: tuple[int]) -> int:
-    return np.ravel_multi_index((site, sublattice), system_shape[:2])
+def site_and_sublattice_to_flat_index(site: np.ndarray[int], sublattice: int, system_shape: tuple[int]) -> int:
+    return np.ravel_multi_index((*site, sublattice), system_shape[:len(system_shape) // 2])
 
 
 class SingleParticleDensityMatrix(metaclass=ABCMeta):
@@ -86,7 +86,7 @@ class MajoranaSingleParticleDensityMatrix(SingleParticleDensityMatrix):
 
         self._matrix = np.zeros(get_system_matrix_shape(self.system_shape))
 
-    def reset(self, sublattice1: int, sublattice2: int, site1: int, site2: int):
+    def reset(self, sublattice1: int, sublattice2: int, site1: np.ndarray[int], site2: np.ndarray[int]):
         """resets i*c^sublattice1_site1*c^sublattice2_site2 -> 1"""
         flat_idx1 = site_and_sublattice_to_flat_index(site1, sublattice1, self.system_shape)
         flat_idx2 = site_and_sublattice_to_flat_index(site2, sublattice2, self.system_shape)
@@ -102,7 +102,7 @@ class ComplexSingleParticleDensityMatrix(SingleParticleDensityMatrix):
     def randomize(self):
         self._matrix = 0.5*np.eye(get_system_matrix_shape(self.system_shape)[0], dtype=complex)
 
-    def reset(self, sublattice1: int, sublattice2: int, site1: int, site2: int):
+    def reset(self, sublattice1: int, sublattice2: int, site1: np.ndarray[int], site2: np.ndarray[int]):
         """resets c^dag^sublattice1_site1*c^sublattice2_site2 -> 0.5i"""
         flat_idx1 = site_and_sublattice_to_flat_index(site1, sublattice1, self.system_shape)
         flat_idx2 = site_and_sublattice_to_flat_index(site2, sublattice2, self.system_shape)
@@ -117,27 +117,27 @@ class FreeFermionHamiltonianTerm(metaclass=ABCMeta):
                  sublattice1: int,
                  sublattice2: int,
                  system_shape: tuple[int, ...],
-                 site1: Optional[int] = None,
-                 site2: Optional[int] = None,
-                 site_offset: Union[int, tuple[int]] = None,
+                 site1: Optional[Union[int, tuple[int, ...], np.ndarray[int]]] = None,
+                 site2: Optional[Union[int, tuple[int, ...], np.ndarray[int]]] = None,
+                 site_offset: Optional[Union[int, tuple[int, ...], np.ndarray[int]]] = None,
                  time_dependence: Optional[Callable] = None,
                  gauge_field: Optional[MajoranaSingleParticleDensityMatrix] = None,
                  gauge_sublattice1: Optional[int] = None,
                  gauge_sublattice2: Optional[int] = None,
-                 gauge_site_offset: Union[int, tuple[int]] = None,
+                 gauge_site_offset: Optional[Union[int, tuple[int, ...], np.ndarray[int]]] = None,
                  dt: float = None,
                  periodic_bc=False):
         self.system_shape = system_shape
-        self.site_offset = site_offset
+        self.site_offset = np.array(site_offset) if site_offset is not None else None
         self.sublattice1 = sublattice1
         self.sublattice2 = sublattice2
-        self.site1 = site1
-        self.site2 = site2
+        self.site1 = np.array(site1) if site1 is not None else None
+        self.site2 = np.array(site2) if site2 is not None else None
         self.time_dependence = time_dependence
         self.gauge_field = gauge_field
         self.gauge_sublattice1 = gauge_sublattice1
         self.gauge_sublattice2 = gauge_sublattice2
-        self.gauge_site_offset = gauge_site_offset
+        self.gauge_site_offset = np.array(gauge_site_offset) if gauge_site_offset is not None else None
         self.dt = dt
         self.periodic_bc = periodic_bc
         self.strength = strength
@@ -147,33 +147,15 @@ class FreeFermionHamiltonianTerm(metaclass=ABCMeta):
         return self._strength
 
     @strength.setter
-    def strength(self, new_strength: Union[float, list[float]]):
+    def strength(self, new_strength: Union[float, np.ndarray[float]]):
         self._strength = new_strength
         self._time_independent_tensor = self.get_zeros_tensor()
         if self.gauge_field is None:
             if self.site1 is not None and self.site2 is not None:
-                self._time_independent_tensor[self.site1, self.sublattice1, self.site2, self.sublattice2] += \
+                self._time_independent_tensor[(*self.site1, self.sublattice1, *self.site2, self.sublattice2)] += \
                     2 * self._strength
-                self._time_independent_tensor[self.site2, self.sublattice2, self.site1, self.sublattice1] += \
+                self._time_independent_tensor[(*self.site2, self.sublattice2, *self.site1, self.sublattice1)] += \
                     2 * self.get_transposed_value(self._strength)
-            elif self.site_offset is not None:
-                add_to_diag(
-                    self._time_independent_tensor[:self.system_shape[0] - self.site_offset, self.sublattice1,
-                    self.site_offset:,
-                    self.sublattice2], 2 * self._strength)
-                add_to_diag(
-                    self._time_independent_tensor[self.site_offset:, self.sublattice2,
-                    :self.system_shape[2] - self.site_offset,
-                    self.sublattice1], 2 * self.get_transposed_value(self._strength))
-                if self.periodic_bc:
-                    add_to_diag(
-                        self._time_independent_tensor[self.system_shape[0] - self.site_offset:, self.sublattice1,
-                        :self.site_offset,
-                        self.sublattice2], 2 * self._strength)
-                    add_to_diag(
-                        self._time_independent_tensor[:self.site_offset, self.sublattice2,
-                        self.system_shape[2] - self.site_offset:,
-                        self.sublattice1], 2 * self.get_transposed_value(self._strength))
 
     @abstractmethod
     def get_zeros_tensor(self):
