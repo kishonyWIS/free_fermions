@@ -365,16 +365,16 @@ class FreeFermionHamiltonian(metaclass=ABCMeta):
     def full_cycle_unitary_faster(self, integration_params: dict, t0: float, tf: float) -> np.ndarray:
         if np.all([x.time_dependence is None for x in self.terms.values()]):
             return expm(self.get_matrix() * (tf - t0))
-        c_basis = np.eye(self.system_shape[0] * self.system_shape[1]).reshape(-1)
+        c_basis = np.eye(np.prod(self.system_shape[:len(self.system_shape)//2])).reshape(-1)
         return self.evolve_single_fermion_faster(c_basis, integration_params=integration_params, t0=t0, tf=tf).reshape(
-            self.system_shape[0] * self.system_shape[1], self.system_shape[0] * self.system_shape[1])
+            *get_system_matrix_shape(self.system_shape))
 
     def full_cycle_unitary_ivp(self, integration_params: dict, t0: float, tf: float) -> np.ndarray:
         if np.all([x.time_dependence is None for x in self.terms.values()]):
             return expm(self.get_matrix() * (tf - t0))
         c_basis = np.eye(self.system_shape[0] * self.system_shape[1]).reshape(-1)
         return self.evolve_single_fermion_ivp(c_basis, integration_params=integration_params, t0=t0, tf=tf).reshape(
-            self.system_shape[0] * self.system_shape[1], self.system_shape[0] * self.system_shape[1])
+            *get_system_matrix_shape(self.system_shape))
 
     @abstractmethod
     def get_ground_state(self, t):
