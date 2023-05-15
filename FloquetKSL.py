@@ -4,9 +4,13 @@ from scipy.linalg import eig
 from matplotlib import pyplot as plt
 
 
-def get_J(t):
-    # periodic function with period 1 applying a plus between t=0 and t=1/3
-    return int(t - np.floor(t) < 1/3)
+def get_J(t, pulse_length=1/3, delay=0):
+    # periodic function with period 1 applying a plus between t=0 and t=pulse_length
+    return int(t - delay - np.floor(t - delay) < pulse_length)/pulse_length
+
+
+def get_J_delayed(delay=0):
+    return lambda t: get_J(t, delay=delay)
 
 
 def get_floquet_KSL_model(num_sites_x, num_sites_y, J, vortex_location=None):
@@ -22,7 +26,10 @@ def get_floquet_KSL_model(num_sites_x, num_sites_y, J, vortex_location=None):
     J_x_strength = np.ones(lattice_shape[:-1] - np.array(site_offset_x)) * J
     J_y_strength = np.ones(lattice_shape[:-1] - np.array(site_offset_y)) * J
     J_z_strength = np.ones(lattice_shape[:-1] - np.array(site_offset_z)) * J
+    # J_x_strength[0,0] = 0
+    # J_x_strength[-1,-1] = 0
     # J_x_strength[2,2] = -J
+
 
     #vortex is given by location_dependent_delay which is the angle/(2*pi) in the x-y plane of the bond location around the vortex
     if vortex_location == 'bond':
@@ -33,20 +40,20 @@ def get_floquet_KSL_model(num_sites_x, num_sites_y, J, vortex_location=None):
             (1, 0)))  # on site
     if vortex_location == 'plaquette':
         vortex_center = tuple(np.array(hexagonal_lattice_site_to_x_y((num_sites_x // 2, num_sites_y // 2, 0))) + np.array(
-            (2, 0)))  # on plaquette
+            (-1, 0)))  # on plaquette
     if vortex_location is None:
         location_dependent_delay = None
     else:
-        location_dependent_delay = lambda x, y: np.arctan2(y - vortex_center[1], x - vortex_center[0]) / (-2*np.pi)
+        location_dependent_delay = lambda x, y: (np.arctan2(y - vortex_center[1], x - vortex_center[0]) + np.pi/2) / (2*np.pi)
 
-    add_J_term(J_x_strength, 'x', hamiltonian, site_offset_x, 0, 1, lattice_shape, t0=0, location_dependent_delay=location_dependent_delay)
-    add_J_term(J_y_strength, 'y', hamiltonian, site_offset_y, 1, 0, lattice_shape, t0=1/3, location_dependent_delay=location_dependent_delay)
-    add_J_term(J_z_strength, 'z', hamiltonian, site_offset_z, 1, 0, lattice_shape, t0=2/3, location_dependent_delay=location_dependent_delay)
+    add_J_term(J_x_strength, 'x', hamiltonian, site_offset_x, 0, 1, lattice_shape, alpha_delay=0, location_dependent_delay=location_dependent_delay)
+    add_J_term(J_y_strength, 'y', hamiltonian, site_offset_y, 1, 0, lattice_shape, alpha_delay=1 / 3, location_dependent_delay=location_dependent_delay)
+    add_J_term(J_z_strength, 'z', hamiltonian, site_offset_z, 1, 0, lattice_shape, alpha_delay=2 / 3, location_dependent_delay=location_dependent_delay)
 
     return hamiltonian
 
 
-def add_J_term(J, alpha, hamiltonian, site_offset, sublattice1, sublattice2, lattice_shape, t0, location_dependent_delay=None):
+def add_J_term(J, alpha, hamiltonian, site_offset, sublattice1, sublattice2, lattice_shape, alpha_delay, location_dependent_delay=None):
     for site1 in np.ndindex(tuple(lattice_shape[:-1] - np.array(site_offset))):
         site2 = tuple(np.array(site1) + np.array(site_offset))
         J_on_site = J[site1] if isinstance(J, np.ndarray) else J
@@ -55,8 +62,9 @@ def add_J_term(J, alpha, hamiltonian, site_offset, sublattice1, sublattice2, lat
             bond_delay = location_dependent_delay(*bond_center)
         else:
             bond_delay = 0
+        time_dependence = get_J_delayed(delay=alpha_delay+bond_delay)
         hamiltonian.add_term(name=f'J{alpha}_{site1}', strength=J_on_site, sublattice1=sublattice1, sublattice2=sublattice2, site1=site1, site2=site2,
-                             time_dependence=lambda t: get_J(t-t0-bond_delay))
+                             time_dependence=time_dependence)
 
 
 def hexagonal_lattice_site_to_x_y(site):
@@ -111,11 +119,14 @@ def draw_state(state, system_shape, hamiltonian:MajoranaFreeFermionHamiltonian =
 
 if __name__ == "__main__":
     integration_params = dict(name='vode', nsteps=2000, rtol=1e-10, atol=1e-14)
-    J = 3*np.pi/4
+    J = np.pi/4
 
     for vortex_location in ['plaquette']:
-        hamiltonian = get_floquet_KSL_model(2,2, J=J, vortex_location=vortex_location)
-        unitary = hamiltonian.full_cycle_unitary_faster(integration_params, 0, 1)
+        num_sites_x = 4
+        num_sites_y = 4
+        hamiltonian = get_floquet_KSL_model(num_sites_x, num_sites_y, J=J, vortex_location=vortex_location)
+        # unitary = hamiltonian.full_cycle_unitary_faster(integration_params, 0, 1)
+        unitary = hamiltonian.full_cycle_unitary_trotterize(0, 1, 10000)
         # draw the real and imaginary parts of the unitary as subplots with colorbars for each
         fig, ax = plt.subplots(1, 2)
         ax[0].imshow(np.real(unitary))
@@ -138,7 +149,8 @@ if __name__ == "__main__":
 
     # acting with the unitary on an initial state with a localized single fermion excitation
     initial_state = np.zeros_like(states[:, 0])
-    initial_site = (0,0, 0)
+    initial_site = (num_sites_x//2,num_sites_y//2-1,1)
+    initial_site = (1,2,1)
     initial_site_index = np.ravel_multi_index(initial_site, hamiltonian.system_shape[:len(hamiltonian.system_shape)//2])
     initial_state[initial_site_index] = 1
     final_state = unitary @ initial_state

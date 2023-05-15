@@ -233,7 +233,7 @@ class MajoranaFreeFermionHamiltonianTerm(FreeFermionHamiltonianTerm):
             i1 = site_and_sublattice_to_flat_index(self.site1, self.sublattice1, self.system_shape)
             i2 = site_and_sublattice_to_flat_index(self.site2, self.sublattice2, self.system_shape)
             small_U_2by2 = np.array([[cos, sin], [-sin, cos]])
-            small_U = sparse.eye(self.system_shape[0] * self.system_shape[1], format='lil')
+            small_U = sparse.eye(np.prod(self.system_shape[:len(self.system_shape)//2]), format='lil')
             small_U[np.ix_([i1, i2], [i1, i2])] = small_U_2by2
         elif self.site_offset is not None:
             diag_terms = np.ones(matrix_shape)
@@ -421,7 +421,7 @@ class MajoranaFreeFermionHamiltonian(FreeFermionHamiltonian):
         return Ud
 
     def _full_cycle_unitary_trotterize_run(self, t0, tf):
-        Ud = np.eye(self.system_shape[0] * self.system_shape[1])
+        Ud = np.eye(np.prod(self.system_shape[:len(self.system_shape)//2]))
         for t in np.arange(0, int((tf - t0) / self.dt)) * self.dt + t0:
             Ud = self._unitary_trotterize_run_step(Ud, t)
         return Ud
