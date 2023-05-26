@@ -31,6 +31,8 @@ def get_system_matrix_shape(system_shape: tuple[int, ...]):
 
 
 def site_and_sublattice_to_flat_index(site: np.ndarray[int], sublattice: int, system_shape: tuple[int]) -> int:
+    if isinstance(site, int):
+        site = np.array([site])
     return np.ravel_multi_index((*site, sublattice), system_shape[:len(system_shape) // 2])
 
 
