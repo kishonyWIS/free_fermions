@@ -40,16 +40,16 @@ def get_KSL_model(f, Delta, g, B, initial_state='random', num_cooling_sublattice
     ground_state = hamiltonian.get_ground_state()
     E_gs = ground_state.get_energy(hamiltonian.get_matrix())
 
-    g_strengthA = -1j
+    g_strengthA = 1j
     if num_cooling_sublattices == 2:
-        g_strengthB = -1j
+        g_strengthB = 1j
     if num_cooling_sublattices == 1:
         g_strengthB = 0
 
     hamiltonian.add_term(name='g_A', strength=g_strengthA, sublattice1=0, sublattice2=2, site_offset=0, time_dependence=g)
     hamiltonian.add_term(name='g_B', strength=g_strengthB, sublattice1=1, sublattice2=3, site_offset=0, time_dependence=g)
-    hamiltonian.add_term(name='B_A', strength=1j, sublattice1=2, sublattice2=4, site_offset=0, time_dependence=B)
-    hamiltonian.add_term(name='B_B', strength=1j, sublattice1=3, sublattice2=5, site_offset=0, time_dependence=B)
+    hamiltonian.add_term(name='B_A', strength=-1j, sublattice1=2, sublattice2=4, site_offset=0, time_dependence=B)
+    hamiltonian.add_term(name='B_B', strength=-1j, sublattice1=3, sublattice2=5, site_offset=0, time_dependence=B)
 
     if initial_state == 'random':
         S = TranslationInvariantKSLState(system_shape)

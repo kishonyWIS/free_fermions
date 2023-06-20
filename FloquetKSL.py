@@ -4,7 +4,7 @@ from scipy.linalg import eig
 from matplotlib import pyplot as plt
 
 
-def get_J(t, pulse_length=1/3, delay=0):
+def get_J(t, pulse_length=1/6, delay=0):
     # periodic function with period 1 applying a plus between t=0 and t=pulse_length
     return int(t - delay - np.floor(t - delay) < pulse_length)/pulse_length
 
@@ -126,7 +126,7 @@ if __name__ == "__main__":
         num_sites_y = 4
         hamiltonian = get_floquet_KSL_model(num_sites_x, num_sites_y, J=J, vortex_location=vortex_location)
         # unitary = hamiltonian.full_cycle_unitary_faster(integration_params, 0, 1)
-        unitary = hamiltonian.full_cycle_unitary_trotterize(0, 1, 10000)
+        unitary = hamiltonian.full_cycle_unitary_trotterize(0, 1, 1000)
         # draw the real and imaginary parts of the unitary as subplots with colorbars for each
         fig, ax = plt.subplots(1, 2)
         ax[0].imshow(np.real(unitary))
