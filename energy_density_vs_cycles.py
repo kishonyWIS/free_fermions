@@ -9,10 +9,10 @@ num_sites = 100
 g0 = 0.5
 B1 = 0.
 B0 = 3.
-T = 6.25
+T = 800.
 t1 = T / 4
 
-trotter_steps = 10000
+trotter_steps = 100000
 cycles = 50
 
 smoothed_g_before_zeroing = lambda t: get_smoothed_func(t, lambda tt: get_g(tt, g0, T, t1), T/10)
@@ -25,8 +25,8 @@ smoothed_B = lambda t: smoothed_B_before_zeroing(t) - smoothed_B_before_zeroing(
 
 errors_per_cycle_per_qubit = [1e-100] #np.linspace(1e-10, 0.02, 10)
 errors_per_cycle = errors_per_cycle_per_qubit * num_sites * 2
-hs = [0.5]
-Js = [1]
+hs = [0.75]
+Js = [0.75]
 periodic_bc = False
 
 columns = ["Ns", "periodic_bc", "drop_one_g_for_odd_bath_signs", "J", "h", "V", "T", "Nt", "N_iter", "errors_per_cycle_per_qubit", "energy_density"]

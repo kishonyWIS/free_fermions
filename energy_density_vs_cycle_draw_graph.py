@@ -6,8 +6,8 @@ import matplotlib as mpl
 import pandas as pd
 import numpy as np
 
-J = 1.0
-h = 0.5
+J = 0.75
+h = 0.75
 V = 0.0
 Ns = 100
 
