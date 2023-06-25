@@ -8,6 +8,7 @@ SIGMA_Z = np.array([[1,0],[0,-1]])
 def get_ux(kx,ky,duration):
     strength = duration*3*np.pi/2
     return np.cos(strength) * np.eye(2) - 1j * np.sin(strength) * SIGMA_Y
+    # return np.cos(strength) * np.eye(2) - 1j * np.sin(strength) * (np.cos(2*kx)*SIGMA_Y + np.sin(2*kx)*SIGMA_Z)
 
 
 def get_uy(kx,ky,duration):
