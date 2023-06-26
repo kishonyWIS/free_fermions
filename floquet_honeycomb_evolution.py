@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.linalg import expm
 
 SIGMA_X = np.array([[0,1],[1,0]])
 SIGMA_Y = np.array([[0,-1j],[1j,0]])
@@ -7,17 +8,20 @@ SIGMA_Z = np.array([[1,0],[0,-1]])
 
 def get_ux(kx,ky,duration):
     strength = duration*3*np.pi/2
+    return expm(-1j * strength * SIGMA_Y * (1+1.))
     return np.cos(strength) * np.eye(2) - 1j * np.sin(strength) * SIGMA_Y
     # return np.cos(strength) * np.eye(2) - 1j * np.sin(strength) * (np.cos(2*kx)*SIGMA_Y + np.sin(2*kx)*SIGMA_Z)
 
 
 def get_uy(kx,ky,duration):
     strength = duration*3*np.pi/2
+    return expm(-1j * strength * ((np.cos(kx)+1.)*SIGMA_Y + np.sin(kx)*SIGMA_X))
     return np.cos(strength) * np.eye(2) - 1j * np.sin(strength) * (np.cos(kx)*SIGMA_Y + np.sin(kx)*SIGMA_X)
 
 
 def get_uz(kx,ky,duration):
     strength = duration*3*np.pi/2
+    return expm(-1j * strength * ((np.cos(ky)+1.)*SIGMA_Y + np.sin(ky)*SIGMA_X))
     return np.cos(strength) * np.eye(2) - 1j * np.sin(strength) * (np.cos(ky)*SIGMA_Y + np.sin(ky)*SIGMA_X)
 
 
