@@ -2,31 +2,35 @@ import numpy as np
 from matplotlib import pyplot as plt
 import pandas as pd
 
-from one_d_ising import get_smoothed_func, get_g, get_B, get_TFI_model
+from one_d_ising import get_TFI_model # get_smoothed_func, get_g, get_B,
+from time_dependence_functions import get_g, get_B
 np.random.seed(0)
 
 num_sites = 100
 g0 = 0.5
 B1 = 0.
 B0 = 3.
-T = 800.
+T = 800.#([12.5,25.,50.,100.,200.,400.,800.])]
 t1 = T / 4
 
 trotter_steps = 100000
 cycles = 50
 
-smoothed_g_before_zeroing = lambda t: get_smoothed_func(t, lambda tt: get_g(tt, g0, T, t1), T/10)
-smoothed_B_before_zeroing = lambda t: get_smoothed_func(t, lambda tt: get_B(tt, B0, B1, T, t1), T/10)
-smoothed_g = lambda t: smoothed_g_before_zeroing(t) - smoothed_g_before_zeroing(T)
-smoothed_B = lambda t: smoothed_B_before_zeroing(t) - smoothed_B_before_zeroing(T)
+# smoothed_g_before_zeroing = lambda t: get_smoothed_func(t, lambda tt: get_g(tt, g0, T, t1), T/10)
+# smoothed_B_before_zeroing = lambda t: get_smoothed_func(t, lambda tt: get_B(tt, B0, B1, T, t1), T/10)
+# smoothed_g = lambda t: smoothed_g_before_zeroing(t) - smoothed_g_before_zeroing(T)
+# smoothed_B = lambda t: smoothed_B_before_zeroing(t) - smoothed_B_before_zeroing(T)
+
+smoothed_g = lambda t: get_g(t, g0, T, t1)
+smoothed_B = lambda t: get_B(t, B0, B1, T)
 
 # integration_params = dict(name='vode', nsteps=20000, rtol=1e-12, atol=1e-16)
 
 
 errors_per_cycle_per_qubit = [1e-100] #np.linspace(1e-10, 0.02, 10)
 errors_per_cycle = errors_per_cycle_per_qubit * num_sites * 2
-hs = [0.75]
-Js = [0.75]
+hs = [0.5]
+Js = [1.]
 periodic_bc = False
 
 columns = ["Ns", "periodic_bc", "drop_one_g_for_odd_bath_signs", "J", "h", "V", "T", "Nt", "N_iter", "errors_per_cycle_per_qubit", "energy_density"]

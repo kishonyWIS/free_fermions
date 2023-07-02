@@ -6,17 +6,18 @@ import matplotlib as mpl
 import pandas as pd
 import numpy as np
 
-J = 0.75
-h = 0.75
+J = 1.0
+h = 0.5
 V = 0.0
 Ns = 100
 
 results_df = pd.read_csv("results_python_energy_density_vs_cycle.csv")
 
-results_df = results_df.query(f"V == {V} & h == {h} & J == {J} & Ns == {Ns} & N_iter<=10")
+results_df = results_df.query(f"V == {V} & h == {h} & J == {J} & Ns == {Ns}")
 
 
 results_df = results_df[results_df['T'].isin([12.5,25.,50.,100.,200.,400.,800.])]
+# results_df = results_df[results_df['T'].isin([200.,400.,800.])]
 # results_df = results_df[results_df['T'].isin([10.,20.,40.,100.])]
 
 
@@ -39,8 +40,9 @@ with sns.axes_style("whitegrid"):
         marker = next(markers)
         color = next(colors)
         group = group[group.Nt == group.Nt.max()]
-        plt.plot(group.N_iter, group.energy_density, linestyle='-', marker=marker, color=color,
-                     label=f'{T}')
+        group_up_to_10_cycles = group.query("N_iter<=10")
+        plt.plot(group_up_to_10_cycles.N_iter, group_up_to_10_cycles.energy_density, linestyle='-', marker=marker,
+                 color=color, label=f'{T}')
         steady_state_energy_density[T] = group.energy_density.iloc[-1]
     ax.set_yscale('log')
     plt.xlabel('Cycle', fontsize='20', fontname='Times New Roman')#, fontweight='bold')
@@ -55,7 +57,7 @@ with sns.axes_style("whitegrid"):
 
 
     fig, ax = plt.subplots()
-    plt.loglog(steady_state_energy_density.keys(), steady_state_energy_density.values(), marker='o', color='k', linestyle='None')
+    plt.semilogy(steady_state_energy_density.keys(), steady_state_energy_density.values(), marker='o', color='k', linestyle='None')
     plt.xlim([10,1000])
     plt.xlabel('$T$', fontsize='20', fontname='Times New Roman')#, fontweight='bold')
     plt.ylabel('Energy density', fontsize='20', fontname='Times New Roman')#, fontweight='bold')
