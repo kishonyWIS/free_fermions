@@ -6,22 +6,21 @@ SIGMA_Y = np.array([[0,-1j],[1j,0]])
 SIGMA_Z = np.array([[1,0],[0,-1]])
 
 
-def get_ux(kx,ky,duration):
-    strength = duration*3*np.pi/2
-    return expm(-1j * strength * SIGMA_Y * (1+1.))
+def get_ux(kx,ky,duration,constant_sigma_y=0.,J_factor=1.):
+    strength = duration*3*np.pi/2 * J_factor
+    return expm(-1j * strength * SIGMA_Y * (1+constant_sigma_y))
     return np.cos(strength) * np.eye(2) - 1j * np.sin(strength) * SIGMA_Y
-    # return np.cos(strength) * np.eye(2) - 1j * np.sin(strength) * (np.cos(2*kx)*SIGMA_Y + np.sin(2*kx)*SIGMA_Z)
 
 
-def get_uy(kx,ky,duration):
-    strength = duration*3*np.pi/2
-    return expm(-1j * strength * ((np.cos(kx)+1.)*SIGMA_Y + np.sin(kx)*SIGMA_X))
+def get_uy(kx,ky,duration,constant_sigma_y=0.,J_factor=1.):
+    strength = duration*3*np.pi/2 * J_factor
+    return expm(-1j * strength * ((np.cos(kx)+constant_sigma_y)*SIGMA_Y + np.sin(kx)*SIGMA_X))
     return np.cos(strength) * np.eye(2) - 1j * np.sin(strength) * (np.cos(kx)*SIGMA_Y + np.sin(kx)*SIGMA_X)
 
 
-def get_uz(kx,ky,duration):
-    strength = duration*3*np.pi/2
-    return expm(-1j * strength * ((np.cos(ky)+1.)*SIGMA_Y + np.sin(ky)*SIGMA_X))
+def get_uz(kx,ky,duration,constant_sigma_y=0.,J_factor=1.):
+    strength = duration*3*np.pi/2 * J_factor
+    return expm(-1j * strength * ((np.cos(ky)+constant_sigma_y)*SIGMA_Y + np.sin(ky)*SIGMA_X))
     return np.cos(strength) * np.eye(2) - 1j * np.sin(strength) * (np.cos(ky)*SIGMA_Y + np.sin(ky)*SIGMA_X)
 
 
@@ -34,7 +33,7 @@ def get_duration(start_time, end_time, delay, t):
     return duration
 
 
-def get_unitary_evolution(kx,ky,theta,t):
+def get_unitary_evolution(kx,ky,theta,t,constant_sigma_y=0.,J_factor=1.):
     delay = theta/(2 * np.pi)
     pulse_end_points = np.linspace(0,2,7)
     unitary = np.eye(2, dtype=complex)
@@ -45,9 +44,9 @@ def get_unitary_evolution(kx,ky,theta,t):
         if duration == 0:
             continue
         if i % 3 == 0:
-            unitary = get_ux(kx,ky,duration) @ unitary
+            unitary = get_ux(kx,ky,duration,constant_sigma_y=constant_sigma_y,J_factor=J_factor) @ unitary
         elif i % 3 == 1:
-            unitary = get_uy(kx,ky,duration) @ unitary
+            unitary = get_uy(kx,ky,duration,constant_sigma_y=constant_sigma_y,J_factor=J_factor) @ unitary
         elif i % 3 == 2:
-            unitary = get_uz(kx,ky,duration) @ unitary
+            unitary = get_uz(kx,ky,duration,constant_sigma_y=constant_sigma_y,J_factor=J_factor) @ unitary
     return unitary
