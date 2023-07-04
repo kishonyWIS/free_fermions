@@ -8,19 +8,19 @@ SIGMA_Z = np.array([[1,0],[0,-1]])
 
 def get_ux(kx,ky,duration,constant_sigma_y=0.,J_factor=1.):
     strength = duration*3*np.pi/2 * J_factor
-    return expm(-1j * strength * SIGMA_Y * (1+constant_sigma_y))
+    # return expm(-1j * strength * SIGMA_Y * (1+constant_sigma_y))
     return np.cos(strength) * np.eye(2) - 1j * np.sin(strength) * SIGMA_Y
 
 
 def get_uy(kx,ky,duration,constant_sigma_y=0.,J_factor=1.):
     strength = duration*3*np.pi/2 * J_factor
-    return expm(-1j * strength * ((np.cos(kx)+constant_sigma_y)*SIGMA_Y + np.sin(kx)*SIGMA_X))
+    # return expm(-1j * strength * ((np.cos(kx)+constant_sigma_y)*SIGMA_Y + np.sin(kx)*SIGMA_X))
     return np.cos(strength) * np.eye(2) - 1j * np.sin(strength) * (np.cos(kx)*SIGMA_Y + np.sin(kx)*SIGMA_X)
 
 
 def get_uz(kx,ky,duration,constant_sigma_y=0.,J_factor=1.):
     strength = duration*3*np.pi/2 * J_factor
-    return expm(-1j * strength * ((np.cos(ky)+constant_sigma_y)*SIGMA_Y + np.sin(ky)*SIGMA_X))
+    # return expm(-1j * strength * ((np.cos(ky)+constant_sigma_y)*SIGMA_Y + np.sin(ky)*SIGMA_X))
     return np.cos(strength) * np.eye(2) - 1j * np.sin(strength) * (np.cos(ky)*SIGMA_Y + np.sin(ky)*SIGMA_X)
 
 
