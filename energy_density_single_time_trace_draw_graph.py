@@ -8,8 +8,8 @@ import pandas as pd
 trotter_steps = 100
 num_sites = 4
 V = 0.0
-J = 0.5
-h = 1.0
+J = 1.0
+h = 0.5
 
 results_df = pd.read_csv("/Users/giladkishony/Dropbox/GILAD/Keva/phd/quantum computation/Periodic Unitaries and Measurements/TestCode/results_energy_density_single_time_trace.csv")
 

@@ -2,7 +2,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 import matplotlib as mpl
 import seaborn as sns
-from one_d_ising import get_smoothed_func, get_g, get_B
+from time_dependence_functions import get_g, get_B
 
 g0 = 0.5
 B1 = 0.
@@ -10,12 +10,8 @@ B0 = 3.
 T = 30.
 t1 = T / 4
 
-
-smoothed_g_before_zeroing = lambda t: get_smoothed_func(t, lambda tt: get_g(tt, g0, T, t1), T/10)
-smoothed_B_before_zeroing = lambda t: get_smoothed_func(t, lambda tt: get_B(tt, B0, B1, T, t1), T/10)
-smoothed_g = lambda t: smoothed_g_before_zeroing(t) - smoothed_g_before_zeroing(T)
-smoothed_B = lambda t: smoothed_B_before_zeroing(t) - smoothed_B_before_zeroing(T)
-
+smoothed_g = lambda t: get_g(t, g0, T, t1)
+smoothed_B = lambda t: get_B(t, B0, B1, T)
 
 ts = np.linspace(0,T,1000)
 gs = []

@@ -2,7 +2,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 import pandas as pd
 
-from one_d_ising import get_smoothed_func, get_g, get_B
+from time_dependence_functions import get_g, get_B
 from translational_invariant_KSL import get_KSL_model, get_Delta, get_f
 
 g0 = 0.5
@@ -20,13 +20,11 @@ n_k_points = 1+6*2
 integration_params = dict(name='vode', nsteps=2000, rtol=1e-6, atol=1e-10)
 
 
-for T in [45,50,55,60]:#np.linspace(5,50,19):
+for T in np.linspace(10,90,17):
     t1 = T / 4
 
-    smoothed_g_before_zeroing = lambda t: get_smoothed_func(t, lambda tt: get_g(tt, g0, T, t1), T / 10)
-    smoothed_B_before_zeroing = lambda t: get_smoothed_func(t, lambda tt: get_B(tt, B0, B1, T, t1), T / 10)
-    smoothed_g = lambda t: smoothed_g_before_zeroing(t) - smoothed_g_before_zeroing(T)
-    smoothed_B = lambda t: smoothed_B_before_zeroing(t) - smoothed_B_before_zeroing(T)
+    smoothed_g = lambda t: get_g(t, g0, T, t1)
+    smoothed_B = lambda t: get_B(t, B0, B1, T)
 
     cycles = 50
     r_tol = 1e-4

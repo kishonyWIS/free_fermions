@@ -3,8 +3,7 @@ from itertools import product
 import numpy as np
 from matplotlib import pyplot as plt
 import pandas as pd
-
-from one_d_ising import get_smoothed_func, get_g, get_B
+from time_dependence_functions import get_g, get_B
 from translational_invariant_KSL import get_KSL_model, get_Delta, get_f
 
 g0 = 0.5
@@ -38,13 +37,11 @@ for n_k_points in [1+6*nn for nn in [1,2,3,4]]:
     ky_list = np.linspace(-np.pi, np.pi, n_k_points)
 
 
-    for T in [10,20,40,80,160]:
+    for T in [10,30,50,70,90]:
         t1 = T / 4
 
-        smoothed_g_before_zeroing = lambda t: get_smoothed_func(t, lambda tt: get_g(tt, g0, T, t1), T / 10)
-        smoothed_B_before_zeroing = lambda t: get_smoothed_func(t, lambda tt: get_B(tt, B0, B1, T, t1), T / 10)
-        smoothed_g = lambda t: smoothed_g_before_zeroing(t) - smoothed_g_before_zeroing(T)
-        smoothed_B = lambda t: smoothed_B_before_zeroing(t) - smoothed_B_before_zeroing(T)
+        smoothed_g = lambda t: get_g(t, g0, T, t1)
+        smoothed_B = lambda t: get_B(t, B0, B1, T)
 
         num_cooling_sublattices = 2
 

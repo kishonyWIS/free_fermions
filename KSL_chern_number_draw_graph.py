@@ -18,8 +18,8 @@ with sns.axes_style("whitegrid"):
     for n_k_points, group in groups:
         marker = next(markers)
         color = next(colors)
-        plt.semilogx(group['T'], group.system_chern_number, linestyle='-', marker=marker, color=color, label=f'{n_k_points}')
-        plt.semilogx(group['T'], -group.bath_chern_number, linestyle='--', marker=marker, color=color)
+        plt.plot(group['T'], group.system_chern_number, linestyle='-', marker=marker, color=color, label=f'{n_k_points}')
+        plt.plot(group['T'], -group.bath_chern_number, linestyle='--', marker=marker, color=color)
     plt.xlabel('$T$', fontsize='20', fontname='Times New Roman')#, fontweight='bold')
     plt.ylabel('$\\nu$', fontsize='20', fontname='Times New Roman')#, fontweight='bold')
     plt.tick_params(axis='both', which='major', labelsize=15)

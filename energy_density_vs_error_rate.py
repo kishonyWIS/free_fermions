@@ -1,15 +1,15 @@
 import numpy as np
 from matplotlib import pyplot as plt
 import pandas as pd
-
-from one_d_ising import get_smoothed_func, get_g, get_B, get_TFI_model
+from time_dependence_functions import get_g, get_B
+from one_d_ising import get_TFI_model
 np.random.seed(0)
 
-num_sites = 2
+num_sites = 8
 g0 = 0.5
 B1 = 0.
 B0 = 3.
-T = 30.
+T = 50.
 t1 = T / 4
 
 
@@ -20,10 +20,8 @@ t1 = T / 4
 # plt.plot(Bs, Es)
 # plt.show()
 
-smoothed_g_before_zeroing = lambda t: get_smoothed_func(t, lambda tt: get_g(tt, g0, T, t1), T/10)
-smoothed_B_before_zeroing = lambda t: get_smoothed_func(t, lambda tt: get_B(tt, B0, B1, T, t1), T/10)
-smoothed_g = lambda t: smoothed_g_before_zeroing(t) - smoothed_g_before_zeroing(T)
-smoothed_B = lambda t: smoothed_B_before_zeroing(t) - smoothed_B_before_zeroing(T)
+smoothed_g = lambda t: get_g(t, g0, T, t1)
+smoothed_B = lambda t: get_B(t, B0, B1, T)
 
 ts = np.linspace(0,T,1000)
 gs = []
@@ -58,12 +56,12 @@ integration_params = dict(name='vode', nsteps=20000, rtol=1e-8, atol=1e-12)
 
 
 trotter_steps = 100
-cycles = 50
-errors_per_cycle_per_qubit = [1e-10, 2e-2] #np.linspace(1e-10, 0.02, 10)
+cycles = 40000
+errors_per_cycle_per_qubit = np.linspace(1e-10, 0.02, 10)#[1e-10, 2e-2] #
 errors_per_cycle = errors_per_cycle_per_qubit * num_sites * 2
 hs = [0.5, 1]
 Js = [1, 0.5]
-periodic_bc = True
+periodic_bc = False
 
 columns = ["Ns", "periodic_bc", "drop_one_g_for_odd_bath_signs", "J", "h", "V", "Nt", "N_iter", "errors_per_cycle_per_qubit", "energy_density", "energy_density_std"];
 results_df = pd.DataFrame(columns=columns)
@@ -136,13 +134,14 @@ for i_h_J, (h, J) in enumerate(zip(hs, Js)):
         plt.plot(Es)
         plt.plot([E_gs]*len(Es))
 
+        cycles_to_wait_for_equilibrium = 10
         new_row = pd.DataFrame({'Ns': num_sites, 'periodic_bc': periodic_bc, 'drop_one_g_for_odd_bath_signs': False, 'J': J,
                                 'h': h, 'V': 0, 'Nt': trotter_steps, 'N_iter': cycles,
-                                'errors_per_cycle_per_qubit': error_rate, 'energy_density': (np.mean(Es[2:]) - E_gs) / num_sites,
-                                'energy_density_std': np.std(Es[2:]) / num_sites / np.sqrt(cycles)},
+                                'errors_per_cycle_per_qubit': error_rate, 'energy_density': (np.mean(Es[cycles_to_wait_for_equilibrium:]) - E_gs) / num_sites,
+                                'energy_density_std': np.std(Es[cycles_to_wait_for_equilibrium:]) / num_sites / np.sqrt(cycles-cycles_to_wait_for_equilibrium)},
                                index=[0])
         results_df = pd.concat([results_df, new_row], ignore_index=True)
-        average_Es.append(np.mean(Es[2:]))
+        average_Es.append(np.mean(Es[cycles_to_wait_for_equilibrium:]))
     plt.figure(100)
     plt.plot(errors_per_cycle_per_qubit, np.array(average_Es - E_gs) / num_sites, linestyle='None', marker='o', label=f'J = {J}, h = {h}')
 

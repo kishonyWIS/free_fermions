@@ -6,18 +6,19 @@ import matplotlib as mpl
 import pandas as pd
 import numpy as np
 
-J = 1.0
-h = 0.5
+J = 0.75
+h = 0.75
 V = 0.0
-Ns = 100
+Ns = 4
 
 results_df = pd.read_csv("results_python_energy_density_vs_cycle.csv")
 
 results_df = results_df.query(f"V == {V} & h == {h} & J == {J} & Ns == {Ns}")
 
 
-results_df = results_df[results_df['T'].isin([12.5,25.,50.,100.,200.,400.,800.])]
-# results_df = results_df[results_df['T'].isin([200.,400.,800.])]
+# results_df = results_df[results_df['T'].isin([12.5,25.,50.,100.,200.,400.,800.])]
+results_df = results_df[results_df['T'].isin(np.arange(10.,110.,10))]
+# results_df = results_df[results_df['T'].isin([30.,50.,70.,90.])]
 # results_df = results_df[results_df['T'].isin([10.,20.,40.,100.])]
 
 
@@ -53,16 +54,3 @@ with sns.axes_style("whitegrid"):
                 prop=mpl.font_manager.FontProperties(family='Times New Roman', size=18))
     plt.tight_layout()
     # plt.savefig(f'graphs/energy_vs_cycle_Ns_{Ns}_J_{J}_h_{h}_V_{V}.pdf')
-
-
-
-    fig, ax = plt.subplots()
-    plt.semilogy(steady_state_energy_density.keys(), steady_state_energy_density.values(), marker='o', color='k', linestyle='None')
-    plt.xlim([10,1000])
-    plt.xlabel('$T$', fontsize='20', fontname='Times New Roman')#, fontweight='bold')
-    plt.ylabel('Energy density', fontsize='20', fontname='Times New Roman')#, fontweight='bold')
-    plt.tick_params(axis='both', which='major', labelsize=15)
-    plt.tight_layout()
-    plt.savefig(f'graphs/steady_state_energy_vs_T_Ns_{Ns}_J_{J}_h_{h}_V_{V}.pdf')
-
-    plt.show()

@@ -6,7 +6,7 @@ import matplotlib as mpl
 import pandas as pd
 import numpy as np
 
-simulation_mode = "single_particle" #"stochastic_schrodinger" "single_particle"
+simulation_mode = "stochastic_schrodinger" #"stochastic_schrodinger" "single_particle"
 trotter_steps = 100
 cycles = 40000
 num_sites = 8

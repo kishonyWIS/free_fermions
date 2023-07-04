@@ -3,7 +3,7 @@ import itertools
 import numpy as np
 from matplotlib import pyplot as plt
 from translational_invariant_KSL import get_KSL_model, get_Delta, get_f
-from one_d_ising import get_smoothed_func, get_g, get_B
+from time_dependence_functions import get_g, get_B
 import seaborn as sns
 import matplotlib as mpl
 
@@ -12,13 +12,11 @@ B0 = 5.
 B1 = 0.
 g0 = 0.5
 
-T = 30.
+T = 50.
 t1 = T / 4
 
-smoothed_g_before_zeroing = lambda t: get_smoothed_func(t, lambda tt: get_g(tt, g0, T, t1), T / 10)
-smoothed_B_before_zeroing = lambda t: get_smoothed_func(t, lambda tt: get_B(tt, B0, B1, T, t1), T / 10)
-smoothed_g = lambda t: smoothed_g_before_zeroing(t) - smoothed_g_before_zeroing(T)
-smoothed_B = lambda t: smoothed_B_before_zeroing(t) - smoothed_B_before_zeroing(T)
+smoothed_g = lambda t: get_g(t, g0, T, t1)
+smoothed_B = lambda t: get_B(t, B0, B1, T)
 
 prop_cycle = plt.rcParams['axes.prop_cycle']
 colors = itertools.cycle(prop_cycle.by_key()['color'])

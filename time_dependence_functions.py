@@ -3,7 +3,7 @@ import numpy as np
 
 def essential_singularity_at_zero(t, tail_length=1):
     if isinstance(t, np.ndarray):
-        t[t==0] = 1e-10
+        t[t==0] = -1e-10
         return np.exp(-tail_length/t) * (t>0)
     else:
         if t <= 0:
