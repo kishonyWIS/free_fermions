@@ -8,8 +8,8 @@ import numpy as np
 
 trotter_steps = 100
 cycles = 1000
-J = 1.0
-h = 0.5
+J = 0.5
+h = 1.0
 V = 0.0
 
 # results_df = pd.read_csv("/Users/giladkishony/Dropbox/GILAD/Keva/phd/quantum computation/Periodic Unitaries and Measurements/TestCode/results_energy_density_vs_system_size_first_excitation.csv")
@@ -36,7 +36,7 @@ with sns.axes_style("whitegrid"):
                      label=errors_per_cycle_per_qubit)
         yerr = np.array(group.energy_density_std_first_excited_state)
         yerr[yerr > group.energy_density_first_excited_state] = 0.9999 * group.energy_density_first_excited_state[yerr > group.energy_density_first_excited_state]
-        plt.errorbar(group.Ns, group.energy_density_first_excited_state, yerr=yerr, linestyle='--', marker=marker, color=color)
+        # plt.errorbar(group.Ns, group.energy_density_first_excited_state, yerr=yerr, linestyle='--', marker=marker, color=color)
     ax.set_yscale('log')
     plt.xlabel('System size', fontsize='20', fontname='Times New Roman')#, fontweight='bold')
     plt.ylabel('Energy density', fontsize='20', fontname='Times New Roman')#, fontweight='bold')
