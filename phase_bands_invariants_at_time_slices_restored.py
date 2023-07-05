@@ -10,26 +10,26 @@ SIGMA_Y = np.array([[0,-1j],[1j,0]])
 SIGMA_Z = np.array([[1,0],[0,-1]])
 
 
-def diagonalize_2_by_2_unitary(u):
-    # decompose unitary in the Pauli basis
-    # u = cos(alpha) + i sin(alpha) (n_x sigma_x + n_y sigma_y + n_z sigma_z)
-    n_x_sin_alpha = np.trace(-1j * u @ SIGMA_X)/2
-    n_y_sin_alpha = np.trace(-1j * u @ SIGMA_Y)/2
-    n_z_sin_alpha = np.trace(-1j * u @ SIGMA_Z)/2
-    n_sin_alpha = np.array([n_x_sin_alpha, n_y_sin_alpha, n_z_sin_alpha])
-    sin_alpha = np.linalg.norm(n_sin_alpha)
-    n = n_sin_alpha / sin_alpha
-    cos_alpha = np.trace(u)/2
-    eigenvalues = np.array([cos_alpha + 1j * sin_alpha, cos_alpha - 1j * sin_alpha])
-    if n[2] == -1:
-        eigenvectors = np.array([[0,1],[1,0]])
-    else:
-        first_eigenvector = np.array([n[2] + 1, n[0] + 1j * n[1]])
-        first_eigenvector /= np.linalg.norm(first_eigenvector)
-        second_eigenvector = np.array([-n[0] + 1j * n[1], n[2] + 1])
-        second_eigenvector /= np.linalg.norm(second_eigenvector)
-        eigenvectors = np.stack([first_eigenvector, second_eigenvector], axis=-1)
-    return eigenvalues, eigenvectors
+# def diagonalize_2_by_2_unitary(u):
+#     # decompose unitary in the Pauli basis
+#     # u = cos(alpha) + i sin(alpha) (n_x sigma_x + n_y sigma_y + n_z sigma_z)
+#     n_x_sin_alpha = np.trace(-1j * u @ SIGMA_X)/2
+#     n_y_sin_alpha = np.trace(-1j * u @ SIGMA_Y)/2
+#     n_z_sin_alpha = np.trace(-1j * u @ SIGMA_Z)/2
+#     n_sin_alpha = np.array([n_x_sin_alpha, n_y_sin_alpha, n_z_sin_alpha])
+#     sin_alpha = np.linalg.norm(n_sin_alpha)
+#     n = n_sin_alpha / sin_alpha
+#     cos_alpha = np.trace(u)/2
+#     eigenvalues = np.array([cos_alpha + 1j * sin_alpha, cos_alpha - 1j * sin_alpha])
+#     if n[2] == -1:
+#         eigenvectors = np.array([[0,1],[1,0]])
+#     else:
+#         first_eigenvector = np.array([n[2] + 1, n[0] + 1j * n[1]])
+#         first_eigenvector /= np.linalg.norm(first_eigenvector)
+#         second_eigenvector = np.array([-n[0] + 1j * n[1], n[2] + 1])
+#         second_eigenvector /= np.linalg.norm(second_eigenvector)
+#         eigenvectors = np.stack([first_eigenvector, second_eigenvector], axis=-1)
+#     return eigenvalues, eigenvectors
 
 
 
@@ -83,7 +83,7 @@ topological_singularities_0 = top_band_phases < 0.0001
 topological_singularities_0[:,:,0] = False
 top_band_states = states[:, :, :, :, 0]
 
-plt.plot(top_band_phases.reshape(len(kx_list)*len(theta_list), len(times)).T)
+# plt.plot(top_band_phases.reshape(len(kx_list)*len(theta_list), len(times)).T)
 
 def make_state_continuous(state_vs_kx_theta, reps=5):
     for rep in range(reps):

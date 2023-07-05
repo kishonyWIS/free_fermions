@@ -69,7 +69,7 @@ for i_kx, kx in enumerate(kx_list):
             u[i_kx, i_theta, i_t, :, :] = get_unitary_evolution(kx, ky, theta, time, constant_sigma_y=0.,J_factor=1.)
             phases[i_kx, i_theta, i_t, :], states[i_kx, i_theta, i_t, :, :] = eig(u[i_kx, i_theta, i_t, :, :])
             # sort the eigenvalues and eigenvectors by the phase of the eigenvalues
-            angles[i_kx, i_theta, i_t, :] = np.abs(np.angle(phases[i_kx, i_theta, i_t, :]).astype(float))
+            angles[i_kx, i_theta, i_t, :] = np.angle(phases[i_kx, i_theta, i_t, :]).astype(float)
             idx = np.argsort(-angles[i_kx, i_theta, i_t, :])
             angles[i_kx, i_theta, i_t, :] = angles[i_kx, i_theta, i_t, idx]
             states[i_kx, i_theta, i_t, :, :] = states[i_kx, i_theta, i_t, :, idx].T
@@ -79,7 +79,7 @@ for i_kx, kx in enumerate(kx_list):
 
 # phases = np.angle(phases)
 
-top_band_phases = angles.max(axis=-1)
+top_band_phases = np.abs(angles.max(axis=-1))
 topological_singularities_pi = top_band_phases > 3.1415
 topological_singularities_0 = top_band_phases < 0.0001
 topological_singularities_0[:,:,0] = False
