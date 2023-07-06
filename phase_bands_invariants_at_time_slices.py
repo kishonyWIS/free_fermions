@@ -33,8 +33,9 @@ SIGMA_Z = np.array([[1,0],[0,-1]])
 
 
 
-nsteps = 2*3*4*5+1
-nsteps = 2
+# nsteps = 2*3*4*5+1
+# nsteps = 2
+nsteps = 91
 
 integration_params = dict(name='vode', nsteps=nsteps, rtol=1e-8, atol=1e-10)
 
