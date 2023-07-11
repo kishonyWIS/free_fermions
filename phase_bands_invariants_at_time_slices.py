@@ -35,14 +35,14 @@ SIGMA_Z = np.array([[1,0],[0,-1]])
 
 # nsteps = 2*3*4*5+1
 # nsteps = 2
-nsteps = 91
+nsteps = 301
 
 integration_params = dict(name='vode', nsteps=nsteps, rtol=1e-8, atol=1e-10)
 
-kx_list = np.linspace(0, np.pi, 31)
+kx_list = np.linspace(0, np.pi, 101)
 ky = 0.
 times = np.linspace(0, 1, nsteps)
-theta_list = np.linspace(0, 2*np.pi, 31)
+theta_list = np.linspace(0, 2*np.pi, 101)
 lamb = 0.0
 
 u = np.zeros((len(kx_list), len(theta_list), len(times), 2, 2), dtype=np.complex128)
@@ -66,14 +66,16 @@ states = np.zeros((len(kx_list), len(theta_list), len(times), 2, 2), dtype=np.co
 for i_kx, kx in enumerate(kx_list):
     print(i_kx)
     for i_theta, theta in enumerate(theta_list):
-        for i_t, time in enumerate(times):
-            u[i_kx, i_theta, i_t, :, :] = get_unitary_evolution(kx, ky, theta, time, constant_sigma_y=0.,J_factor=1.)
-            phases[i_kx, i_theta, i_t, :], states[i_kx, i_theta, i_t, :, :] = eig(u[i_kx, i_theta, i_t, :, :])
-            # sort the eigenvalues and eigenvectors by the phase of the eigenvalues
-            angles[i_kx, i_theta, i_t, :] = np.angle(phases[i_kx, i_theta, i_t, :]).astype(float)
-            idx = np.argsort(-angles[i_kx, i_theta, i_t, :])
-            angles[i_kx, i_theta, i_t, :] = angles[i_kx, i_theta, i_t, idx]
-            states[i_kx, i_theta, i_t, :, :] = states[i_kx, i_theta, i_t, :, idx].T
+        i_t = nsteps // 2 + i_kx
+        time = times[i_t]
+        # for i_t, time in enumerate(times):
+        u[i_kx, i_theta, i_t, :, :] = get_unitary_evolution(kx, ky, theta, time, constant_sigma_y=0.,J_factor=1.)
+        phases[i_kx, i_theta, i_t, :], states[i_kx, i_theta, i_t, :, :] = eig(u[i_kx, i_theta, i_t, :, :])
+        # sort the eigenvalues and eigenvectors by the phase of the eigenvalues
+        angles[i_kx, i_theta, i_t, :] = np.angle(phases[i_kx, i_theta, i_t, :]).astype(float)
+        idx = np.argsort(-angles[i_kx, i_theta, i_t, :])
+        angles[i_kx, i_theta, i_t, :] = angles[i_kx, i_theta, i_t, idx]
+        states[i_kx, i_theta, i_t, :, :] = states[i_kx, i_theta, i_t, :, idx].T
 
 
 
@@ -86,7 +88,7 @@ topological_singularities_0 = top_band_phases < 0.0001
 topological_singularities_0[:,:,0] = False
 top_band_states = states[:, :, :, :, 0]
 
-plt.plot(top_band_phases.reshape(len(kx_list)*len(theta_list), len(times)).T)
+# plt.plot(top_band_phases.reshape(len(kx_list)*len(theta_list), len(times)).T)
 
 def make_state_continuous(state_vs_kx_theta, reps=5):
     for rep in range(reps):
@@ -134,6 +136,10 @@ def get_topological_invariant(state_vs_kx_theta, reps=5):
         calculate_winding_number(state_vs_kx_theta[i_kx, :, :])
 
 
+top_band_states_on_plane = np.zeros((len(kx_list), len(theta_list), 2), dtype=np.complex128)
+for i_kx in range(len(kx_list)):
+    for i_theta in range(len(theta_list)):
+        top_band_states_on_plane[i_kx, i_theta, :] = top_band_states[i_kx, i_theta, nsteps//2 + i_kx, :]
 
 # iterate over all times and set a continuous gauge for the states at each time in the k_x,theta plane
 
