@@ -6,7 +6,7 @@ from one_d_ising import get_TFI_model # get_smoothed_func, get_g, get_B,
 from time_dependence_functions import get_g, get_B
 np.random.seed(0)
 
-num_sites = 40
+num_sites = 100
 g0 = 0.5
 B1 = 0.
 B0 = 3.
@@ -16,7 +16,7 @@ T_list = np.arange(10.,110.,10)
 for T in T_list:
     t1 = T / 4
 
-    trotter_steps = 100000
+    trotter_steps = 100
     cycles = 50
 
     # smoothed_g_before_zeroing = lambda t: get_smoothed_func(t, lambda tt: get_g(tt, g0, T, t1), T/10)
@@ -32,8 +32,8 @@ for T in T_list:
 
     errors_per_cycle_per_qubit = [1e-100] #np.linspace(1e-10, 0.02, 10)
     errors_per_cycle = errors_per_cycle_per_qubit * num_sites * 2
-    hs = [0.5, 0.75]
-    Js = [1., 0.75]
+    hs = [0.5]
+    Js = [1.]
     periodic_bc = False
 
     columns = ["Ns", "periodic_bc", "drop_one_g_for_odd_bath_signs", "J", "h", "V", "T", "Nt", "N_iter", "errors_per_cycle_per_qubit", "energy_density"]
