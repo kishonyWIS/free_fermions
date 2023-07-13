@@ -1,5 +1,6 @@
 import numpy as np
 from scipy.linalg import expm
+from scipy.linalg import eig
 
 SIGMA_X = np.array([[0,1],[1,0]])
 SIGMA_Y = np.array([[0,-1j],[1j,0]])
@@ -50,3 +51,14 @@ def get_unitary_evolution(kx,ky,theta,t,constant_sigma_y=0.,J_factor=1.):
         elif i % 3 == 2:
             unitary = get_uz(kx,ky,duration,constant_sigma_y=constant_sigma_y,J_factor=J_factor) @ unitary
     return unitary
+
+
+def diagonalize_unitary_at_k_theta_time(kx, ky, theta, time):
+    unitary = get_unitary_evolution(kx, ky, theta, time, constant_sigma_y=0., J_factor=1.)
+    phases, states = eig(unitary)
+    # sort the eigenvalues and eigenvectors by the phase of the eigenvalues
+    angles = np.angle(phases).astype(float)
+    idx = np.argsort(-angles)
+    angles = angles[idx]
+    states = states[:, idx]
+    return angles, states
