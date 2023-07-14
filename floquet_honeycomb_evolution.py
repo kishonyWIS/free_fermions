@@ -1,5 +1,6 @@
 import numpy as np
 from scipy.linalg import expm
+from matplotlib import pyplot as plt
 from scipy.linalg import eig
 
 SIGMA_X = np.array([[0,1],[1,0]])
@@ -62,3 +63,49 @@ def diagonalize_unitary_at_k_theta_time(kx, ky, theta, time):
     angles = angles[idx]
     states = states[:, idx]
     return angles, states
+
+
+def make_state_continuous(state_vs_kx_theta, reps=5):
+    for rep in range(reps):
+        for i_kx in range(state_vs_kx_theta.shape[0]):
+            for i_theta in range(state_vs_kx_theta.shape[1]):
+                if i_kx == 0 and i_theta == 0:
+                    continue
+                if i_kx == 0:
+                    reference_state = state_vs_kx_theta[i_kx, i_theta - 1, :]
+                if i_theta == 0:
+                    if rep == 0:
+                        reference_state = state_vs_kx_theta[i_kx - 1, i_theta, :]
+                    else:
+                        reference_state = 1 / 2 * (
+                                    state_vs_kx_theta[i_kx - 1, i_theta, :] + state_vs_kx_theta[i_kx, i_theta - 1, :])
+                if i_kx != 0 and i_theta != 0:
+                    reference_state = 1 / 2 * (
+                                state_vs_kx_theta[i_kx - 1, i_theta, :] + state_vs_kx_theta[i_kx, i_theta - 1, :])
+                D = np.dot(state_vs_kx_theta[i_kx, i_theta, :].conj(), reference_state)
+                D = D / np.abs(D)
+                state_vs_kx_theta[i_kx, i_theta, :] = state_vs_kx_theta[i_kx, i_theta, :] * D
+    return state_vs_kx_theta
+
+
+def calculate_winding_number(state_vs_theta):
+    phase_vs_theta = np.angle(state_vs_theta[0,:].conj() @ state_vs_theta.T)
+    plt.figure()
+    plt.plot(phase_vs_theta)
+
+
+def get_topological_invariant(state_vs_kx_theta, reps=5):
+    state_vs_kx_theta = make_state_continuous(state_vs_kx_theta, reps=reps)
+    # check for continuity
+    plt.figure()
+    plt.imshow(
+        np.linalg.norm(np.diff(state_vs_kx_theta, axis=0), axis=-1))
+    plt.colorbar()
+    plt.figure()
+    plt.imshow(
+        np.linalg.norm(np.diff(np.concatenate([state_vs_kx_theta, state_vs_kx_theta[:,:10,:]], axis=1), axis=1), axis=-1))
+    plt.colorbar()
+
+    # calculate the winding number at kx=0 and kx=pi
+    for i_kx in [0,-1]:
+        calculate_winding_number(state_vs_kx_theta[i_kx, :, :])
