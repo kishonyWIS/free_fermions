@@ -1,90 +1,86 @@
 import numpy as np
-from scipy.linalg import eig
 from matplotlib import pyplot as plt
-from floquet_honeycomb_evolution import get_unitary_evolution, diagonalize_unitary_at_k_theta_time, get_topological_invariant
-from interpolation import interpolate_hyperplane, find_nearest_index
-
-# define the pauli matrices
-SIGMA_X = np.array([[0,1],[1,0]])
-SIGMA_Y = np.array([[0,-1j],[1j,0]])
-SIGMA_Z = np.array([[1,0],[0,-1]])
-
-
-nsteps = 2
-nsteps = 301
+from floquet_honeycomb_evolution import diagonalize_unitary_at_k_theta_time, get_topological_invariant
+from interpolation import interpolate_hyperplane
+from find_phase_band_singularities import plot_singularities_3d
 
 kx_list = np.linspace(0, np.pi, 101)
 ky = 0.
-times = np.linspace(0, 1, nsteps)
-theta_list = np.linspace(0, 2*np.pi, 201)
-lamb = 0.0
+theta_list = np.linspace(0, 2*np.pi, 101)
 
-u = np.zeros((len(kx_list), len(theta_list), len(times), 2, 2), dtype=np.complex128)
-phases = np.zeros((len(kx_list), len(theta_list), len(times), 2), dtype=np.complex128)
-angles = np.zeros((len(kx_list), len(theta_list), len(times), 2))
-states = np.zeros((len(kx_list), len(theta_list), len(times), 2, 2), dtype=np.complex128)
+u = np.zeros((len(kx_list), len(theta_list), 2, 2), dtype=np.complex128)
+angles = np.zeros((len(kx_list), len(theta_list), 2))
+states = np.zeros((len(kx_list), len(theta_list), 2, 2), dtype=np.complex128)
+TIME = np.zeros((len(kx_list),len(theta_list)))
 
 # anchors define the hyperplane
+# start time
+# anchors = [np.array([0,0,0]),
+#            np.array([0,2*np.pi,0]),
+#            np.array([np.pi,0,0]),
+#            np.array([np.pi,2*np.pi,0])]
+
+# end time
+# anchors = [np.array([0,0,1]),
+#            np.array([0,2*np.pi,1]),
+#            np.array([np.pi,0,1]),
+#            np.array([np.pi,2*np.pi,1])]
+
+# between the zero and pi singularities
 anchors = [np.array([0,0,0.5]),
            np.array([0,2*np.pi,0.5]),
            np.array([np.pi,0,5./6.]),
+           np.array([np.pi,2*np.pi/3,5./6.]),
            np.array([np.pi,2*np.pi,5./6.]),
-           np.array([np.pi,2*np.pi*2/3.,0.6])]
+           np.array([np.pi,2*np.pi*2/3.,0.5])]
 
-# times_matrix = np.zeros((len(kx_list), len(theta_list)))
-# for i_kx, kx in enumerate(kx_list):
-#     for i_theta, theta in enumerate(theta_list):
-#         # get the index of the time slice at kx, theta by interpolating points in 3d space
-#         point = np.array([kx, theta])
-#         times_matrix[i_kx, i_theta] = interpolate_hyperplane(anchors, point)[2]
 
-# iterate over all the values of ky, theta
-# and calculate the unitary for each
-# for i_kx, kx in enumerate(kx_list):
-#     print(i_kx)
-#     for i_theta, theta in enumerate(theta_list):
-#         # get the index of the time slice at kx, theta by interpolating points in 3d space
-#
-#         i_t = nsteps // 2 + i_kx
-#         time = times[i_t]
-#         # for i_t, time in enumerate(times):
-#         angles[i_kx, i_theta, i_t, :], states[i_kx, i_theta, i_t, :, :] = diagonalize_unitary_at_k_theta_time(kx, ky, theta, time)
+# singularities are at lines defined by endpoints kx,theta,t in 3D space
+singularities_0 = [(np.array([np.pi, 0, 2/3]), np.array([np.pi, 2*np.pi/3, 2/3])),
+                   (np.array([np.pi, 0, 2/3]), np.array([np.pi, 2*np.pi/3, 0])),
+                   (np.array([np.pi, 2*np.pi/3, 2/3]), np.array([np.pi, 2*np.pi*2/3, 0]))]
 
+singularities_pi = [(np.array([0, 0, 2/3]), np.array([0, 2*np.pi, 2/3])),
+                    (np.array([0, 2*np.pi*2/3, 2/3]), np.array([np.pi, 2*np.pi*2/3, 2/3]))]
 
 for i_kx, kx in enumerate(kx_list):
     print(i_kx)
     for i_theta, theta in enumerate(theta_list):
         point = np.array([kx, theta])
         time = interpolate_hyperplane(anchors, point)[2]
+        TIME[i_kx, i_theta] = time
         i_t = 0
-        angles[i_kx, i_theta, i_t, :], states[i_kx, i_theta, i_t, :, :] = diagonalize_unitary_at_k_theta_time(kx, ky,
-                                                                                                              theta,
-                                                                                                              time)
+        angles[i_kx, i_theta, :], states[i_kx, i_theta, :, :] = diagonalize_unitary_at_k_theta_time(kx, ky, theta, time)
 
 
 top_band_phases = np.abs(angles.max(axis=-1))
 topological_singularities_pi = top_band_phases > 3.1415
 topological_singularities_0 = top_band_phases < 0.0001
-topological_singularities_0[:,:,0] = False
-top_band_states = states[:, :, :, :, 0]
+# topological_singularities_0[:,:,0] = False
+top_band_states = states[:, :, :, 0]
 
-# plt.plot(top_band_phases.reshape(len(kx_list)*len(theta_list), len(times)).T)
+KX, THETA = np.meshgrid(kx_list, theta_list, indexing='ij')
+plt.pcolor(KX,THETA,top_band_phases)
+plt.colorbar()
 
+fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
+surf = ax.plot_surface(KX, THETA, TIME)
+# plot the singularities
 
-top_band_states_on_plane = np.zeros((len(kx_list), len(theta_list), 2), dtype=np.complex128)
-top_band_phases_on_plane = np.zeros((len(kx_list), len(theta_list)), dtype=np.complex128)
-for i_kx in range(len(kx_list)):
-    for i_theta in range(len(theta_list)):
-        top_band_states_on_plane[i_kx, i_theta, :] = top_band_states[i_kx, i_theta, nsteps//2 + i_kx, :]
-        top_band_phases_on_plane[i_kx, i_theta] = top_band_phases[i_kx, i_theta, nsteps//2 + i_kx]
+def plot_line_between_points_in_3d(point_1, point_2, ax, color='k'):
+    ax.plot([point_1[0], point_2[0]], [point_1[1], point_2[1]], [point_1[2], point_2[2]], color=color)
 
-# calculate the overlap of states in consecutive parameter points
-# for i_kx in range(top_band_states_on_plane.shape[0]):
-#     for i_theta in range(top_band_states_on_plane.shape[1]):
-#         current_state = top_band_states_on_plane[i_kx, i_theta, :]
-#         prev_state = top_band_states_on_plane[i_kx-1, i_theta, :]
-#         overlap = current_state.T.conj() @ prev_state
-#         if np.abs(np.abs(overlap)-1) > 0.01:
-#             print(i_kx, i_theta, overlap)
+for singularity_line in singularities_0:
+    plot_line_between_points_in_3d(singularity_line[0], singularity_line[1], ax, color='r')
+for singularity_line in singularities_pi:
+    plot_line_between_points_in_3d(singularity_line[0], singularity_line[1], ax, color='b')
+
+plot_singularities_3d(ky, 41, 0.1, ax)
+
+ax.set_xlabel('kx')
+ax.set_ylabel('theta')
+ax.set_zlabel('time')
+
+get_topological_invariant(top_band_states)
 
 print()
