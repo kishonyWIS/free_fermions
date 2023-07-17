@@ -92,6 +92,8 @@ def calculate_winding_number(state_vs_theta):
     phase_vs_theta = np.angle(state_vs_theta[0,:].conj() @ state_vs_theta.T)
     plt.figure()
     plt.plot(phase_vs_theta)
+    plt.xlabel('theta')
+    plt.ylabel('phase of eigenstate')
 
 
 def get_topological_invariant(state_vs_kx_theta, reps=5):
@@ -107,5 +109,6 @@ def get_topological_invariant(state_vs_kx_theta, reps=5):
     plt.colorbar()
 
     # calculate the winding number at kx=0 and kx=pi
-    for i_kx in [0,-1]:
+    for i_kx, kx in zip([0,-1], [0,np.pi]):
         calculate_winding_number(state_vs_kx_theta[i_kx, :, :])
+        plt.title('kx = {}'.format(kx))
