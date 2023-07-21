@@ -5,7 +5,7 @@ from floquet_honeycomb_evolution import get_unitary_evolution, diagonalize_unita
 from interpolation import interpolate_hyperplane
 from mpl_toolkits.mplot3d import Axes3D
 
-def plot_singularities_3d(ky, res_grid, res_energy=0.1, ax=None):
+def plot_singularities_3d(ky, res_grid, res_energy=0.1, ax=None, pulse_length = 1/3):
 
     kx_list = np.linspace(0, np.pi, res_grid)
     theta_list = np.linspace(0, 2 * np.pi, res_grid)
@@ -20,7 +20,7 @@ def plot_singularities_3d(ky, res_grid, res_energy=0.1, ax=None):
         print(i_kx)
         for i_theta, theta in enumerate(theta_list):
             for i_t, time in enumerate(times):
-                angles[i_kx, i_theta, i_t], states[i_kx, i_theta, i_t, :] = diagonalize_unitary_at_k_theta_time(kx, ky, theta, time)
+                angles[i_kx, i_theta, i_t], states[i_kx, i_theta, i_t, :] = diagonalize_unitary_at_k_theta_time(kx, ky, theta, time, pulse_length=pulse_length)
 
     top_band_phases = np.abs(angles.max(axis=-1))
     topological_singularities_pi = top_band_phases > np.pi - res_energy

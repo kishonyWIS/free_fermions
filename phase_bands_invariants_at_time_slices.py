@@ -7,7 +7,8 @@ from scipy.interpolate import LinearNDInterpolator
 
 
 kx_list = np.linspace(0, np.pi, 101)
-ky = 0.
+ky = 0
+pulse_length = 1/3
 theta_list = np.linspace(0, 2*np.pi, 101)
 KX, THETA = np.meshgrid(kx_list, theta_list, indexing='ij')
 
@@ -23,18 +24,18 @@ states = np.zeros((len(kx_list), len(theta_list), 2, 2), dtype=np.complex128)
 #            np.array([np.pi,2*np.pi,0])]
 
 # end time
-# anchors = [np.array([0,0,1]),
-#            np.array([0,2*np.pi,1]),
-#            np.array([np.pi,0,1]),
-#            np.array([np.pi,2*np.pi,1])]
+anchors = [np.array([0,0,1]),
+           np.array([0,2*np.pi,1]),
+           np.array([np.pi,0,1]),
+           np.array([np.pi,2*np.pi,1])]
 
 # between the zero and pi singularities for ky=0
-anchors = [np.array([0,0,0.5]),
-           np.array([0,2*np.pi,0.5]),
-           np.array([np.pi,0,5/6]),
-           np.array([np.pi,2*np.pi/3,5/6]),
-           np.array([np.pi,2*np.pi,5/6]),
-           np.array([np.pi,2*np.pi*2/3.,0.5])]
+# anchors = [np.array([0,0,0.5]),
+#            np.array([0,2*np.pi,0.5]),
+#            np.array([np.pi,0,5/6]),
+#            np.array([np.pi,2*np.pi/3,5/6]),
+#            np.array([np.pi,2*np.pi,5/6]),
+#            np.array([np.pi,2*np.pi*2/3.,0.5])]
 
 # between the zero and pi singularities for ky=np.pi
 # anchors = [np.array([0,0,0.5]),
@@ -54,8 +55,8 @@ for i_kx, kx in enumerate(kx_list):
     for i_theta, theta in enumerate(theta_list):
         point = np.array([kx, theta])
         time = TIME[i_kx, i_theta]
-        i_t = 0
-        angles[i_kx, i_theta, :], states[i_kx, i_theta, :, :] = diagonalize_unitary_at_k_theta_time(kx, ky, theta, time)
+        # ang, stat = diagonalize_unitary_at_k_theta_time(0.4, 0.7, 0, 1, pulse_length=pulse_length)
+        angles[i_kx, i_theta, :], states[i_kx, i_theta, :, :] = diagonalize_unitary_at_k_theta_time(kx, ky, theta, time, pulse_length = pulse_length)
 
 
 top_band_phases = np.abs(angles.max(axis=-1))
@@ -73,7 +74,7 @@ fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
 surf = ax.plot_surface(KX, THETA, TIME)
 
 # plot the singularities
-plot_singularities_3d(ky, 41, 0.1, ax)
+plot_singularities_3d(ky, 41, 0.1, ax, pulse_length=pulse_length)
 
 ax.set_xlabel('kx')
 ax.set_ylabel('theta')

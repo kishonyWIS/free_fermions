@@ -57,14 +57,20 @@ def add_J_term(J, alpha, hamiltonian, site_offset, sublattice1, sublattice2, lat
     for site1 in np.ndindex(tuple(lattice_shape[:-1] - np.array(site_offset))):
         site2 = tuple(np.array(site1) + np.array(site_offset))
         J_on_site = J[site1] if isinstance(J, np.ndarray) else J
-        if location_dependent_delay is not None:
-            bond_center = get_x_y_of_bond_center_from_site1_site2((*site1, sublattice1), (*site2, sublattice2))
-            bond_delay = location_dependent_delay(*bond_center)
-        else:
-            bond_delay = 0
-        time_dependence = get_J_delayed(delay=alpha_delay+bond_delay)
+        delay = get_bond_delay(alpha_delay, location_dependent_delay, site1, site2, sublattice1, sublattice2)
+        time_dependence = get_J_delayed(delay=delay)
         hamiltonian.add_term(name=f'J{alpha}_{site1}', strength=J_on_site, sublattice1=sublattice1, sublattice2=sublattice2, site1=site1, site2=site2,
                              time_dependence=time_dependence)
+
+
+def get_bond_delay(alpha_delay, location_dependent_delay, site1, site2, sublattice1, sublattice2):
+    if location_dependent_delay is not None:
+        bond_center = get_x_y_of_bond_center_from_site1_site2((*site1, sublattice1), (*site2, sublattice2))
+        bond_delay = location_dependent_delay(*bond_center)
+    else:
+        bond_delay = 0
+    delay = alpha_delay + bond_delay
+    return delay
 
 
 def hexagonal_lattice_site_to_x_y(site):
