@@ -2,6 +2,7 @@ import numpy as np
 from free_fermion_hamiltonian import MajoranaFreeFermionHamiltonian
 from scipy.linalg import eig
 from matplotlib import pyplot as plt
+import matplotlib
 
 
 def get_J(t, pulse_length=1/6, delay=0):
@@ -50,7 +51,7 @@ def get_floquet_KSL_model(num_sites_x, num_sites_y, J, vortex_location=None):
     add_J_term(J_y_strength, 'y', hamiltonian, site_offset_y, 1, 0, lattice_shape, alpha_delay=1 / 3, location_dependent_delay=location_dependent_delay)
     add_J_term(J_z_strength, 'z', hamiltonian, site_offset_z, 1, 0, lattice_shape, alpha_delay=2 / 3, location_dependent_delay=location_dependent_delay)
 
-    return hamiltonian
+    return hamiltonian, location_dependent_delay
 
 
 def add_J_term(J, alpha, hamiltonian, site_offset, sublattice1, sublattice2, lattice_shape, alpha_delay, location_dependent_delay=None):
@@ -86,14 +87,36 @@ def get_x_y_of_bond_center_from_site1_site2(site1, site2):
     x, y = (x1+x2)/2, (y1+y2)/2
     return x, y
 
-def draw_state(state, system_shape, hamiltonian:MajoranaFreeFermionHamiltonian = None, circle_radius=1/3, ax=None):
+def draw_lattice(system_shape, state=None, hamiltonian:MajoranaFreeFermionHamiltonian = None, circle_radius=1 / 3, ax=None,
+                 location_dependent_delay=None, color_bonds_by='xyz'):
     # draw all sites as circles with size according to the absolute value of the state and color according to the phase
     # this part draws the hamiltonian terms as lines between the sites with color according to the term name being x, y or z
     # the lines are drawn at the center of the site but are not contained in a circle of radius circle_radius which is also drawn
     arrow_to_circle_scale = 0.9
+    colormap = matplotlib.colormaps['hot']
     if ax is None:
         fig, ax = plt.subplots()
     xyz_to_color = {'x': 'b', 'y': 'g', 'z': 'r'}
+    xyz_to_delay = {'x': 0, 'y':1/3, 'z':2/3}
+
+    # this part draws the state by drawing arrows pointing according to the phase and with size according to the absolute value
+    # the arrows are drawn at the center of the site and are contained in a circle of radius 1/2 which is also drawn
+
+    lattice_shape = system_shape[:len(system_shape) // 2]
+    if state is not None:
+        state = state.reshape(lattice_shape)
+        phase = np.angle(state)
+    for site in np.ndindex(lattice_shape):
+        x, y = hexagonal_lattice_site_to_x_y(site)
+        circle = plt.Circle((x, y), circle_radius, color='k', fill=state is None)
+        ax.add_patch(circle)
+        if state is not None:
+            site_phase = phase[site]
+            strength = np.array(np.abs(state[site])**2/np.max(np.abs(state))**2).reshape(1,1)
+            ax.quiver(x, y, arrow_to_circle_scale*2*circle_radius*np.cos(site_phase), arrow_to_circle_scale*2*circle_radius*np.sin(site_phase),
+                      scale=1,
+                      units='xy', pivot='middle', alpha=strength)
+
     if hamiltonian is not None:
         for name, term in hamiltonian.terms.items():
             site1 = term.site1
@@ -104,23 +127,21 @@ def draw_state(state, system_shape, hamiltonian:MajoranaFreeFermionHamiltonian =
             x2, y2 = hexagonal_lattice_site_to_x_y((*site2, sublattice2))
             x1_at_circle_edge, y1_at_circle_edge = x1 + circle_radius*(x2-x1), y1 + circle_radius*(y2-y1)
             x2_at_circle_edge, y2_at_circle_edge = x2 - circle_radius*(x2-x1), y2 - circle_radius*(y2-y1)
-            color = xyz_to_color[name[1]]
+            bond_center = get_x_y_of_bond_center_from_site1_site2((*site1, sublattice1), (*site2, sublattice2))
+            delay = xyz_to_delay[name[1]] + (location_dependent_delay(*bond_center) if location_dependent_delay else 0)
+            delay = delay % 1
+            if color_bonds_by == 'xyz':
+                color = xyz_to_color[name[1]]
+            if color_bonds_by == 'delay':
+                color = colormap(delay)
             ax.plot([x1_at_circle_edge, x2_at_circle_edge], [y1_at_circle_edge, y2_at_circle_edge], color=color, linewidth=2)
-    # this part draws the state by drawing arrows pointing according to the phase and with size according to the absolute value
-    # the arrows are drawn at the center of the site and are contained in a circle of radius 1/2 which is also drawn
-    lattice_shape = system_shape[:len(system_shape) // 2]
-    state = state.reshape(lattice_shape)
-    phase = np.angle(state)
-    for site in np.ndindex(lattice_shape):
-        x, y = hexagonal_lattice_site_to_x_y(site)
-        site_phase = phase[site]
-        circle = plt.Circle((x, y), circle_radius, color='k', fill=False)
-        ax.add_patch(circle)
-        strength = np.array(np.abs(state[site])**2/np.max(np.abs(state))**2).reshape(1,1)
-        ax.quiver(x, y, arrow_to_circle_scale*2*circle_radius*np.cos(site_phase), arrow_to_circle_scale*2*circle_radius*np.sin(site_phase),
-                  scale=1,
-                  units='xy', pivot='middle', alpha=strength)
-        ax.axis('equal')
+            ax.text(bond_center[0],bond_center[1],'{0:.2f}'.format(delay))
+    if color_bonds_by == 'delay':
+        cmap = matplotlib.cm.ScalarMappable(norm=None, cmap=colormap)
+        cmap.set_array([])
+        plt.colorbar(cmap, label='Pulse Delay')
+
+    ax.axis('equal')
 
 
 if __name__ == "__main__":
@@ -130,7 +151,7 @@ if __name__ == "__main__":
     for vortex_location in ['plaquette']:
         num_sites_x = 4
         num_sites_y = 4
-        hamiltonian = get_floquet_KSL_model(num_sites_x, num_sites_y, J=J, vortex_location=vortex_location)
+        hamiltonian, location_dependent_delay = get_floquet_KSL_model(num_sites_x, num_sites_y, J=J, vortex_location=vortex_location)
         # unitary = hamiltonian.full_cycle_unitary_faster(integration_params, 0, 1)
         unitary = hamiltonian.full_cycle_unitary_trotterize(0, 1, 1000)
         # draw the real and imaginary parts of the unitary as subplots with colorbars for each
@@ -160,15 +181,18 @@ if __name__ == "__main__":
     initial_site_index = np.ravel_multi_index(initial_site, hamiltonian.system_shape[:len(hamiltonian.system_shape)//2])
     initial_state[initial_site_index] = 1
     final_state = unitary @ initial_state
+    # draw the lattice with the delays
+    draw_lattice(hamiltonian.system_shape, hamiltonian=hamiltonian, location_dependent_delay=location_dependent_delay, color_bonds_by='delay', circle_radius=0.1)
+    plt.show()
     # draw the initial and final states in subplots
     _, ax = plt.subplots(1, 2)
-    draw_state(initial_state, hamiltonian.system_shape, hamiltonian, ax=ax[0])
-    draw_state(final_state, hamiltonian.system_shape, hamiltonian, ax=ax[1])
+    draw_lattice(hamiltonian.system_shape, initial_state, hamiltonian, location_dependent_delay=location_dependent_delay, ax=ax[0])
+    draw_lattice(hamiltonian.system_shape, final_state, hamiltonian, location_dependent_delay=location_dependent_delay, ax=ax[1])
     ax[0].set_title('initial state')
     ax[1].set_title('final state')
 
 
     for state, energy in zip(states.T, energies):
-        draw_state(state, hamiltonian.system_shape, hamiltonian)
+        draw_lattice(hamiltonian.system_shape, state, hamiltonian, location_dependent_delay=location_dependent_delay)
         plt.title(f'energy/$\pi$ = {energy/np.pi}')
         plt.show()
