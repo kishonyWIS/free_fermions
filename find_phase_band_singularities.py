@@ -7,7 +7,7 @@ from mpl_toolkits.mplot3d import Axes3D
 
 def plot_singularities_3d(ky, res_grid, res_energy=0.1, ax=None, pulse_length = 1/3):
 
-    kx_list = np.linspace(0, np.pi, res_grid)
+    kx_list = np.linspace(0, np.pi, res_grid//2)
     theta_list = np.linspace(0, 2 * np.pi, res_grid)
     times = np.linspace(0, 1, res_grid)
 
@@ -35,14 +35,12 @@ def plot_singularities_3d(ky, res_grid, res_energy=0.1, ax=None, pulse_length = 
 
     size = 21
     pos = np.where(topological_singularities_0)
-    ax.scatter(kx_list[pos[0]], theta_list[pos[1]], times[pos[2]], c='r')
+    ax.scatter(kx_list[pos[0]], theta_list[pos[1]], times[pos[2]], c='r', s=20)
 
     pos = np.where(topological_singularities_pi)
 
-    ax.scatter(kx_list[pos[0]], theta_list[pos[1]], times[pos[2]], c='b')
+    ax.scatter(kx_list[pos[0]], theta_list[pos[1]], times[pos[2]], c='b', s=20)
 
-    ax.set_xlabel('kx')
-    ax.set_ylabel('theta')
-    ax.set_zlabel('time')
-
-    plt.show()
+    ax.set_xlabel('$k_x$')
+    ax.set_ylabel('$\theta$')
+    ax.set_zlabel('$t$')

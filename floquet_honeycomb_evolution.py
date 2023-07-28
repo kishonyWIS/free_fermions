@@ -93,7 +93,7 @@ def get_unitary_evolution_pulses_with_overlaps(pulse_strengths,pulse_start_point
 
 
 def get_pulse_parameters(kx,ky,theta,t,pulse_length,i_pulse,J=3*np.pi/2):
-    delay = -theta/(2 * np.pi)
+    delay = theta/(2 * np.pi)
     # calculate the start and end time modulo 1
     start_time = (i_pulse*1/3 + delay) % 1
     end_time = (i_pulse*1/3 + delay + pulse_length) % 1

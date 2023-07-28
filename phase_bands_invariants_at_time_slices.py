@@ -4,6 +4,24 @@ from floquet_honeycomb_evolution import diagonalize_unitary_at_k_theta_time, get
 from interpolation import interpolate_hyperplane
 from find_phase_band_singularities import plot_singularities_3d
 from scipy.interpolate import LinearNDInterpolator
+import matplotlib
+import seaborn as sns
+
+
+def edit_graph(xlabel, ylabel, zlabel, ax):
+    sns.set_style("whitegrid")
+    rc = {"font.family": "serif",
+          "mathtext.fontset": "stix",
+          "figure.autolayout": True}
+    plt.rcParams.update(rc)
+    plt.rcParams["font.serif"] = ["Times New Roman"] + plt.rcParams["font.serif"]
+    ax.set_xlabel(xlabel, fontsize='20', fontname='Times New Roman')
+    ax.set_ylabel(ylabel, fontsize='20', fontname='Times New Roman')
+    ax.set_zlabel(zlabel, fontsize='20', fontname='Times New Roman')
+    plt.tick_params(axis='x', which='major', labelsize=15)
+    plt.tick_params(axis='y', which='major', labelsize=15)
+    plt.tick_params(axis='z', which='major', labelsize=15)
+    plt.tight_layout()
 
 
 kx_list = np.linspace(0, np.pi, 101)
@@ -24,28 +42,30 @@ states = np.zeros((len(kx_list), len(theta_list), 2, 2), dtype=np.complex128)
 #            np.array([np.pi,2*np.pi,0])]
 
 # end time
-anchors = [np.array([0,0,1]),
-           np.array([0,2*np.pi,1]),
-           np.array([np.pi,0,1]),
-           np.array([np.pi,2*np.pi,1])]
+# anchors = [np.array([0,0,1]),
+#            np.array([0,2*np.pi,1]),
+#            np.array([np.pi,0,1]),
+#            np.array([np.pi,2*np.pi,1])]
 
 # between the zero and pi singularities for ky=0
-# anchors = [np.array([0,0,0.5]),
-#            np.array([0,2*np.pi,0.5]),
-#            np.array([np.pi,0,5/6]),
-#            np.array([np.pi,2*np.pi/3,5/6]),
-#            np.array([np.pi,2*np.pi,5/6]),
-#            np.array([np.pi,2*np.pi*2/3.,0.5])]
+
+anchors = [np.array([0,0,0.5]),
+           np.array([0,2*np.pi,0.5]),
+           np.array([np.pi,0,5/6]),
+           np.array([np.pi,2*np.pi*2/3,5/6]),
+           np.array([np.pi,2*np.pi,5/6]),
+           np.array([np.pi,2*np.pi/3.,0.5])]
 
 # between the zero and pi singularities for ky=np.pi
-# anchors = [np.array([0,0,0.5]),
-#            np.array([0,2*np.pi,0.5]),
-#            np.array([np.pi,2*np.pi/3,0.5]),
-#            np.array([0,2*np.pi/3,5/6]),
+
+# anchors = [np.array([0,2*np.pi,0.5]),
+#            np.array([0,0,0.5]),
+#            np.array([np.pi,2*np.pi*2/3,0.5]),
 #            np.array([0,2*np.pi*2/3,5/6]),
-#            np.array([np.pi,0,5/6]),
-#            np.array([np.pi,2*np.pi*2/3,5/6]),
-#            np.array([np.pi,2*np.pi,5/6])]
+#            np.array([0,2*np.pi/3,5/6]),
+#            np.array([np.pi,2*np.pi,5/6]),
+#            np.array([np.pi,2*np.pi/3,5/6]),
+#            np.array([np.pi,0,5/6])]
 
 interp = LinearNDInterpolator(np.array(anchors)[:,:-1], np.array(anchors)[:,-1])
 TIME = interp(KX, THETA)
@@ -60,9 +80,6 @@ for i_kx, kx in enumerate(kx_list):
 
 
 top_band_phases = np.abs(angles.max(axis=-1))
-topological_singularities_pi = top_band_phases > 3.1415
-topological_singularities_0 = top_band_phases < 0.0001
-# topological_singularities_0[:,:,0] = False
 top_band_states = states[:, :, :, 0]
 
 plt.pcolor(KX,THETA,top_band_phases)
@@ -71,14 +88,21 @@ plt.ylabel('theta')
 plt.colorbar()
 
 fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
-surf = ax.plot_surface(KX, THETA, TIME)
+surf = ax.plot_surface(KX, THETA, TIME, cmap=matplotlib.cm.plasma, alpha=0.5, linewidth=0, antialiased=False)
 
 # plot the singularities
-plot_singularities_3d(ky, 41, 0.1, ax, pulse_length=pulse_length)
+plot_singularities_3d(ky, 22, 0.05, ax, pulse_length=pulse_length)
 
-ax.set_xlabel('kx')
-ax.set_ylabel('theta')
-ax.set_zlabel('time')
+ax.invert_zaxis()
+ax.view_init(elev=10., azim=108, vertical_axis='y') # for ky=0
+ax.set_xticks([0, np.pi])
+ax.set_xticklabels([0, '$\pi$'])
+ax.set_yticks([0, 2*np.pi/3, 2*np.pi*2/3, 2*np.pi])
+ax.set_yticklabels([0, '$2\pi/3$', '$4\pi/3$', '$2\pi$'])
+ax.set_zticks([0, 1/3, 2/3, 1])
+ax.set_zticklabels([0, '$T/3$', '$2T/3$', '$T$'])
+edit_graph('$k_x$', '$\\theta$', '$t$', ax)
+plt.savefig(f'graphs/time_vortex/kx_theta_t_space_ky_{ky:.2f}.pdf')
 
 get_topological_invariant(top_band_states)
 plt.show()
