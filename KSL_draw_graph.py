@@ -14,20 +14,21 @@ marker = next(markers)
 color = next(colors)
 
 with sns.axes_style("whitegrid"):
-    plt.rcParams['legend.title_fontsize'] = 40
+    fig, ax = plt.subplots()
+    plt.rcParams['legend.title_fontsize'] = 50
     plt.rcParams["font.family"] = "Times New Roman"
-    plt.figure()
     groups = results_df.groupby(["num_cooling_sublattices"])
     for num_cooling_sublattices, group in groups:
         marker = next(markers)
         color = next(colors)
-        plt.semilogy(group['T'], group.energy_density, linestyle='None', color=color, marker=marker, markersize=10, label=f'{num_cooling_sublattices}')
-    plt.xlabel('$T$', fontsize='40', fontname='Times New Roman')#, fontweight='bold')
-    plt.ylabel('Energy density', fontsize='40', fontname='Times New Roman')#, fontweight='bold')
-    plt.tick_params(axis='both', which='major', labelsize=30)
+        ax.semilogy(group['T'], group.energy_density, linestyle='None', color=color, marker=marker, markersize=10, label=f'{num_cooling_sublattices}')
+    plt.xlabel('$T$', fontsize='50', fontname='Times New Roman')#, fontweight='bold')
+    plt.ylabel('Energy density', fontsize='50', fontname='Times New Roman')#, fontweight='bold')
+    ax.yaxis.set_label_coords(-0.25, 0.4)
+    plt.tick_params(axis='both', which='major', labelsize=38)
     # l = plt.legend(prop=mpl.font_manager.FontProperties(family='Times New Roman', size=15))
     # l.set_title(title='auxiliary sites per unit cell',
     #             prop=mpl.font_manager.FontProperties(family='Times New Roman', size=18))
-    plt.tight_layout()
-    plt.savefig(f'graphs/KSL_energy_density_vs_T.pdf')
+    fig.tight_layout(pad=0.5)
+    plt.savefig(f'graphs/KSL_energy_density_vs_T.pdf', transparent=True)
     plt.show()
