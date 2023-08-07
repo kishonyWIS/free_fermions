@@ -139,14 +139,18 @@ def draw_lattice(system_shape, state=None, hamiltonian:MajoranaFreeFermionHamilt
     circles = []
     for site in np.ndindex(lattice_shape):
         x, y = hexagonal_lattice_site_to_x_y(site)
-        circle = Circle((x, y), circle_radius, color='gray', fill=state is None)
-        circles.append(circle)
         if state is not None:
             site_phase = phase[site]
             strength = np.array(np.abs(state[site])**2/np.max(np.abs(state))**2).reshape(1,1)
-            ax.quiver(x, y, arrow_to_circle_scale*2*circle_radius*np.cos(site_phase), arrow_to_circle_scale*2*circle_radius*np.sin(site_phase),
-                      scale=1,
-                      units='xy', pivot='middle', alpha=strength, zorder=2)
+            # ax.quiver(x, y, arrow_to_circle_scale*2*circle_radius*np.cos(site_phase), arrow_to_circle_scale*2*circle_radius*np.sin(site_phase),
+            #           scale=1,
+            #           units='xy', pivot='middle', alpha=strength, zorder=2)
+        else:
+            strength = 0
+        circle = Circle((x, y), circle_radius, color=str(1-float(strength)), fill=True)#state is None)
+        circles.append(circle)
+        circle = Circle((x, y), circle_radius, color='gray', fill=False)#state is None)
+        circles.append(circle)
     coll = matplotlib.collections.PatchCollection(circles, zorder=1, match_original=True)
     ax.add_collection(coll)
 
@@ -230,8 +234,8 @@ if __name__ == "__main__":
     J = np.pi/4*0.9
     pulse_length = 1/2
     vortex_location = 'plaquette'
-    num_sites_x = 6
-    num_sites_y = 6
+    num_sites_x = 4
+    num_sites_y = 4
     hamiltonian, location_dependent_delay, vortex_center = get_floquet_KSL_model(num_sites_x, num_sites_y, J=J, pulse_length=pulse_length, vortex_location=vortex_location)
     # unitary = hamiltonian.full_cycle_unitary_faster(integration_params, 0, 1)
     unitary = hamiltonian.full_cycle_unitary_trotterize(0, 1, 1000)
@@ -257,6 +261,11 @@ if __name__ == "__main__":
     plt.savefig(f'graphs/time_vortex/spectrum_Nx_{num_sites_x}_Ny_{num_sites_y}_J_{J:.2f}_pulse_length_{pulse_length:.2f}.pdf', bbox_inches='tight')
     plt.show()
 
+    # draw the lattice with the xyz
+    draw_lattice(hamiltonian.system_shape, hamiltonian=hamiltonian, location_dependent_delay=location_dependent_delay, color_bonds_by='xyz', circle_radius=0.1)
+    plt.savefig(
+        f'graphs/time_vortex/xyz_on_the_lattice_Nx_{num_sites_x}_Ny_{num_sites_y}.pdf')
+    plt.show()
     # draw the lattice with the delays
     draw_lattice(hamiltonian.system_shape, hamiltonian=hamiltonian, location_dependent_delay=location_dependent_delay, color_bonds_by='delay', circle_radius=0.1)
     plt.savefig(
