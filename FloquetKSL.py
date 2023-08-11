@@ -8,6 +8,7 @@ import seaborn as sns
 from matplotlib.patches import Circle
 import random
 from scipy.stats import gaussian_kde
+from scipy.optimize import minimize
 
 def edit_graph(xlabel, ylabel, legend_title=None, colorbar_title=None, colormap=None, colorbar_args={}, tight=True, ylabelpad=None):
     sns.set_style("whitegrid")
@@ -137,22 +138,32 @@ def draw_lattice(system_shape, state=None, hamiltonian:MajoranaFreeFermionHamilt
         phase = np.angle(state)
 
     circles = []
+    colors = []
+    circles_colormap = matplotlib.cm.get_cmap('gray').reversed()
+    max_strength = np.max(np.abs(state))**2 if state is not None else 1
     for site in np.ndindex(lattice_shape):
         x, y = hexagonal_lattice_site_to_x_y(site)
         if state is not None:
             site_phase = phase[site]
-            strength = np.array(np.abs(state[site])**2/np.max(np.abs(state))**2).reshape(1,1)
+            strength = (np.abs(state[site])**2)/max_strength
             # ax.quiver(x, y, arrow_to_circle_scale*2*circle_radius*np.cos(site_phase), arrow_to_circle_scale*2*circle_radius*np.sin(site_phase),
             #           scale=1,
             #           units='xy', pivot='middle', alpha=strength, zorder=2)
         else:
             strength = 0
-        circle = Circle((x, y), circle_radius, color=str(1-float(strength)), fill=True)#state is None)
+        # draw a circle at the center of the site with a radius of circle_radius and color in grayscale according to the strength
+        circle = Circle((x, y), circle_radius, color=circles_colormap(strength), fill=True)  # state is None)
         circles.append(circle)
+        colors.append(strength)
         circle = Circle((x, y), circle_radius, color='gray', fill=False)#state is None)
         circles.append(circle)
-    coll = matplotlib.collections.PatchCollection(circles, zorder=1, match_original=True)
+    coll = matplotlib.collections.PatchCollection(circles, cmap=circles_colormap, zorder=1, match_original=True)
     ax.add_collection(coll)
+    if state is not None:
+        cbar = plt.colorbar(coll, orientation='horizontal', aspect=30, shrink=0.5, ticks=[0, 0.5, 1])
+        cbar.ax.tick_params(labelsize=18)
+        cbar.ax.set_xticklabels(list(map('{0:.2f}'.format,[0,max_strength/2,max_strength])), fontname='Times New Roman')
+
 
     if hamiltonian is not None:
         for name, term in hamiltonian.terms.items():
@@ -229,13 +240,29 @@ def draw_spectrum(energies, distance_from_vortex, ax=None, colormap='plasma'):
     edit_graph('Density of States', 'Energy', colorbar_title='Distance from Time Vortex', colormap=colormap)
 
 
+def get_vortex_and_edge_state(energies, states, vortex_center, system_shape):
+    # sort the states by the absolute value of their energy and take the two highest
+    sort_indices = np.argsort(np.abs(energies))
+    state1, state2 = states[:, sort_indices[-1]], states[:, sort_indices[-2]]
+    # find the normalized linear combination of the two states that has the smallest
+    # get_average_distance_of_state_from_vortex
+    minimize_result = minimize(lambda x: get_average_distance_of_state_from_vortex(system_shape, np.cos(x[0]/2)*state1+np.sin(x[0]/2)*np.exp( 1j*x[1])*state2, vortex_center), x0=[0.5, 0.5])
+    theta = minimize_result.x[0]
+    phi = minimize_result.x[1]
+    vortex_state = np.cos(theta/2)*state1+np.sin(theta/2)*np.exp(1j*phi)*state2
+    # find the state that is orthogonal to the vortex state and has the highest energy
+    edge_state = np.cos((np.pi-theta)/2)*state1+np.sin((np.pi-theta)/2)*np.exp(1j*(phi+np.pi))*state2
+    states[:, sort_indices[-1]], states[:, sort_indices[-2]] = vortex_state, edge_state
+    return states
+
+
 if __name__ == "__main__":
     integration_params = dict(name='vode', nsteps=2000, rtol=1e-10, atol=1e-14)
     J = np.pi/4*0.9
     pulse_length = 1/2
     vortex_location = 'plaquette'
-    num_sites_x = 4
-    num_sites_y = 4
+    num_sites_x = 6
+    num_sites_y = 6
     hamiltonian, location_dependent_delay, vortex_center = get_floquet_KSL_model(num_sites_x, num_sites_y, J=J, pulse_length=pulse_length, vortex_location=vortex_location)
     # unitary = hamiltonian.full_cycle_unitary_faster(integration_params, 0, 1)
     unitary = hamiltonian.full_cycle_unitary_trotterize(0, 1, 1000)
@@ -255,6 +282,7 @@ if __name__ == "__main__":
 
     # plot the energies
     distance_from_vortex = np.zeros_like(energies)
+    states = get_vortex_and_edge_state(energies, states, vortex_center, hamiltonian.system_shape)
     for i in range(len(energies)):
         distance_from_vortex[i] = get_average_distance_of_state_from_vortex(hamiltonian.system_shape, states[:, i], vortex_center)
     draw_spectrum(energies, distance_from_vortex)

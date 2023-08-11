@@ -4,8 +4,41 @@ from matplotlib import pyplot as plt
 from floquet_honeycomb_evolution import get_unitary_evolution, diagonalize_unitary_at_k_theta_time, get_topological_invariant
 from interpolation import interpolate_hyperplane
 from mpl_toolkits.mplot3d import Axes3D
+import matplotlib
+from scipy.interpolate import LinearNDInterpolator
+
 
 def plot_singularities_3d(ky, res_grid, res_energy=0.1, ax=None, pulse_length = 1/3):
+    kx_list = np.linspace(0, np.pi, 101)
+    theta_list = np.linspace(0, 2 * np.pi, 101)
+    KX, THETA = np.meshgrid(kx_list, theta_list, indexing='ij')
+
+    if ky == 0.:
+        point_singularities_0 = [[np.pi, 0, 2/3]]
+        point_singularities_pi = []
+        line_singularities_0 = [[[np.pi, np.pi], [2*np.pi/3, 4*np.pi/3], [0, 2 / 3]],
+                                [[np.pi, np.pi], [4*np.pi/3, 2*np.pi], [0, 2 / 3]],
+                                [[np.pi, np.pi], [4*np.pi/3, 2*np.pi], [2/3, 2 / 3]]]
+        line_singularities_pi = [[[0, np.pi], [2 / 3 * np.pi, 2 / 3 * np.pi], [2 / 3, 2 / 3]],
+                                 [[0, 0],[0, 2*np.pi],[2/3, 2/3]]]
+        plane_singularities_0 = []
+        plane_singularities_pi = []
+    elif ky == np.pi:
+        point_singularities_0 = []
+        point_singularities_pi = [[0,0,2/3], [0,2*np.pi,2/3], [np.pi,4/3*np.pi,2/3]]
+        line_singularities_0 = [[[np.pi, np.pi], [0, 2 * np.pi / 3], [2/3, 2 / 3]],
+                                [[0, 0], [2 * np.pi / 3, 4 * np.pi / 3], [2/3, 2 / 3]],
+                                [[0, 0], [2 * np.pi / 3, 4 * np.pi / 3], [0, 2 / 3]],
+                                [[np.pi, np.pi], [4 * np.pi / 3, 2 * np.pi], [0, 2 / 3]]]
+        for kx in np.linspace(0,np.pi,100):
+            line_singularities_0.append([[kx,kx],[0,2/3*np.pi],[0,2/3]])
+        line_singularities_pi = []
+        plane_singularities_0 = [[[0,0,0],
+                                 [np.pi,0,0],
+                                 [0,2*np.pi/3,2/3],
+                                 [np.pi,2*np.pi/3,2/3]]]
+        plane_singularities_pi = []
+
 
     kx_list = np.linspace(0, np.pi, res_grid//2)
     theta_list = np.linspace(0, 2 * np.pi, res_grid)
@@ -35,11 +68,33 @@ def plot_singularities_3d(ky, res_grid, res_energy=0.1, ax=None, pulse_length = 
 
     size = 21
     pos = np.where(topological_singularities_0)
-    ax.scatter(kx_list[pos[0]], theta_list[pos[1]], times[pos[2]], c='r', s=20)
+    zorder_0 = 1 if ky == np.pi else 30
+    # s = ax.scatter(kx_list[pos[0]], theta_list[pos[1]], times[pos[2]], c='r', s=20, alpha=1, zorder=zorder_0)
+    for point in point_singularities_0:
+        # ax.scatter(point[0], point[1], point[2], c='r', s=size, alpha=1, zorder=zorder_0)
+        ax.plot([point[0]]*2, [point[1]]*2, [point[2],point[2]-0.002], c='r', alpha=1, linewidth=5,zorder=zorder_0)
+    for line in line_singularities_0:
+        ax.plot(line[0], line[1], line[2], c='r', alpha=1, linewidth=5,zorder=zorder_0)
+    # for plane in plane_singularities_0:
+    #     interp = LinearNDInterpolator(np.array(plane)[:, :-1], np.array(plane)[:, -1])
+    #     TIME = interp(KX, THETA)
+    #     surf = ax.plot_surface(KX, THETA, TIME, color='r', alpha=1, linewidth=0,
+    #                            antialiased=True, zorder=1)# , cmap=matplotlib.cm.get_cmap("Reds")
 
     pos = np.where(topological_singularities_pi)
 
-    ax.scatter(kx_list[pos[0]], theta_list[pos[1]], times[pos[2]], c='b', s=20)
+    # s = ax.scatter(kx_list[pos[0]], theta_list[pos[1]], times[pos[2]], c='b', s=20, alpha=1, zorder=30)
+    # ax.plot([0, np.pi], [2 / 3 * np.pi, 2 / 3 * np.pi], [2 / 3, 2 / 3], c='b', alpha=1, linewidth=5,zorder=30)
+    for point in point_singularities_pi:
+        # ax.scatter(point[0], point[1], point[2], c='b', s=size, alpha=1, zorder=30)
+        ax.plot([point[0]]*2, [point[1]]*2, [point[2],point[2]-0.002], c='b', alpha=1, linewidth=5,zorder=30)
+    for line in line_singularities_pi:
+        ax.plot(line[0], line[1], line[2], c='b', alpha=1, linewidth=5,zorder=30)
+    # for plane in plane_singularities_pi:
+    #     interp = LinearNDInterpolator(np.array(plane)[:, :-1], np.array(plane)[:, -1])
+    #     TIME = interp(KX, THETA)
+    #     surf = ax.plot_surface(KX, THETA, TIME, color='b', alpha=1, linewidth=0,
+    #                            antialiased=True, zorder=30) #, cmap=matplotlib.cm.get_cmap("Blues")
 
     ax.set_xlabel('$k_x$')
     ax.set_ylabel('$\theta$')

@@ -1,7 +1,6 @@
 import numpy as np
 from matplotlib import pyplot as plt
 from floquet_honeycomb_evolution import diagonalize_unitary_at_k_theta_time, get_topological_invariant
-from interpolation import interpolate_hyperplane
 from find_phase_band_singularities import plot_singularities_3d
 from scipy.interpolate import LinearNDInterpolator
 import matplotlib
@@ -25,7 +24,7 @@ def edit_graph(xlabel, ylabel, zlabel, ax):
 
 
 kx_list = np.linspace(0, np.pi, 101)
-ky = 0
+ky = 0.
 pulse_length = 1/3
 theta_list = np.linspace(0, 2*np.pi, 101)
 KX, THETA = np.meshgrid(kx_list, theta_list, indexing='ij')
@@ -88,13 +87,13 @@ plt.ylabel('theta')
 plt.colorbar()
 
 fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
-surf = ax.plot_surface(KX, THETA, TIME, cmap=matplotlib.cm.plasma, alpha=0.5, linewidth=0, antialiased=False)
+surf = ax.plot_surface(KX, THETA, TIME, cmap=matplotlib.cm.plasma.reversed(), alpha=0.7, linewidth=0, antialiased=True, zorder=3)
 
 # plot the singularities
 plot_singularities_3d(ky, 22, 0.05, ax, pulse_length=pulse_length)
 
 ax.invert_zaxis()
-ax.view_init(elev=10., azim=108, vertical_axis='y') # for ky=0
+ax.view_init(elev=12., azim=105, vertical_axis='y') # for ky=0, elev=10., azim=108, ky=pi, elev=12., azim=105
 ax.set_xticks([0, np.pi])
 ax.set_xticklabels([0, '$\pi$'])
 ax.set_yticks([0, 2*np.pi/3, 2*np.pi*2/3, 2*np.pi])
