@@ -16,7 +16,7 @@ Jz = 1.
 
 T = 30.
 
-n_k_points = 1+6*2
+n_k_points = 85
 
 
 integration_params = dict(name='vode', nsteps=2000, rtol=1e-6, atol=1e-10)

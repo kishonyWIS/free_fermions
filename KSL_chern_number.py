@@ -31,13 +31,13 @@ def get_chern_number_from_single_particle_dm(single_particle_dm):
     return (np.sum(integrand)/(2*np.pi)).imag
 
 
-for n_k_points in [1+6*nn for nn in [1,2,3,4]]:
+for n_k_points in [1+6*nn for nn in [14]]:
 
     kx_list = np.linspace(-np.pi, np.pi, n_k_points)
     ky_list = np.linspace(-np.pi, np.pi, n_k_points)
 
 
-    for T in [10,30,50,70,90]:
+    for T in [110,130,150]:#10,30,50,70,90
         t1 = T / 4
 
         smoothed_g = lambda t: get_g(t, g0, T, t1)
@@ -50,6 +50,7 @@ for n_k_points in [1+6*nn for nn in [1,2,3,4]]:
         single_particle_dm = np.zeros((n_k_points, n_k_points, 6, 6), dtype=complex)
 
         for i_kx, kx in enumerate(kx_list):
+            print(f'kx={kx}')
             for i_ky, ky in enumerate(ky_list):
 
                 f = get_f(kx, ky, Jx, Jy, Jz)
@@ -73,11 +74,11 @@ for n_k_points in [1+6*nn for nn in [1,2,3,4]]:
                         # S.reset_all_tau()
                         Es.append(S.get_energy(hamiltonian.get_matrix(T)))
                         cycle += 1
-                        print(cycle)
+                        # print(cycle)
 
-                print(f'kx={kx}, ky={ky}')
-                print(Es[-1])
-                print('ground state energy = ' + str(E_gs))
+                # print(f'kx={kx}, ky={ky}')
+                # print(Es[-1])
+                # print('ground state energy = ' + str(E_gs))
                 E_diff[i_kx, i_ky] = Es[-1] - E_gs
                 single_particle_dm[i_kx,i_ky,:,:] = S.matrix
 
@@ -85,9 +86,9 @@ for n_k_points in [1+6*nn for nn in [1,2,3,4]]:
         total_chern_number = get_chern_number_from_single_particle_dm(single_particle_dm)
         system_chern_number = get_chern_number_from_single_particle_dm(single_particle_dm[:,:,:2,:2])
         bath_chern_number = get_chern_number_from_single_particle_dm(single_particle_dm[:,:,2:,2:])
-        print(f'total chern number = {total_chern_number}')
-        print(f'system chern number = {system_chern_number}')
-        print(f'bath chern number = {bath_chern_number}')
+        # print(f'total chern number = {total_chern_number}')
+        # print(f'system chern number = {system_chern_number}')
+        # print(f'bath chern number = {bath_chern_number}')
 
 
         results_df = pd.DataFrame({'Jx': Jx, 'Jy': Jy, 'Jz': Jz, 'kappa': kappa, 'B0': B0, 'g0': g0,

@@ -4,14 +4,14 @@ from matplotlib import pyplot as plt
 import matplotlib as mpl
 import pandas as pd
 
-results_df = pd.read_csv("KSL_complex.csv")
+results_df = pd.read_csv("KSL_complex_chern.csv")
 
 markers = itertools.cycle(['o', 's', '^', '*', '8', 'p', 'd', 'v'])
 prop_cycle = plt.rcParams['axes.prop_cycle']
 colors = itertools.cycle(prop_cycle.by_key()['color'])
 
-marker = next(markers)
-color = next(colors)
+# marker = next(markers)
+# color = next(colors)
 
 with sns.axes_style("whitegrid"):
     fig, ax = plt.subplots()
@@ -21,7 +21,7 @@ with sns.axes_style("whitegrid"):
     for num_cooling_sublattices, group in groups:
         marker = next(markers)
         color = next(colors)
-        ax.semilogy(group['T'], group.energy_density, linestyle='None', color=color, marker=marker, markersize=10, label=f'{num_cooling_sublattices}')
+        ax.semilogy(group['T'], group.energy_density, linestyle='-', color=color, marker=marker, markersize=10, label=f'{num_cooling_sublattices}')
     plt.xlabel('$T$', fontsize='50', fontname='Times New Roman')#, fontweight='bold')
     plt.ylabel('Energy density', fontsize='50', fontname='Times New Roman')#, fontweight='bold')
     ax.yaxis.set_label_coords(-0.25, 0.4)
