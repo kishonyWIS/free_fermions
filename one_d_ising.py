@@ -111,8 +111,8 @@ def get_TFI_model(num_sites, h, J, g, B, initial_state = 'random', periodic_bc=F
     errors_effect_gauge = {}
     for name, sublattices in spin_to_fermion_sublattices.items():
         for i in range(num_sites):
-            all_errors_unitaries[name + '_' + str(i)] = get_fermion_bilinear_unitary(system_shape=system_shape, site1=i,
-                                                                                     site2=i, **sublattices)
+            all_errors_unitaries[name + '_' + str(i)] = get_fermion_bilinear_unitary(system_shape=system_shape, site1=[i],
+                                                                                     site2=[i], **sublattices)
             errors_effect_gauge[name + '_' + str(i)] = np.any(
                 [(sublattice in [1, 2]) for sublattice in sublattices.values()])
 

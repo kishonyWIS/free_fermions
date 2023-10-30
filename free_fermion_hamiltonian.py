@@ -158,6 +158,25 @@ class FreeFermionHamiltonianTerm(metaclass=ABCMeta):
                     2 * self._strength
                 self._time_independent_tensor[(*self.site2, self.sublattice2, *self.site1, self.sublattice1)] += \
                     2 * self.get_transposed_value(self._strength)
+            elif self.site_offset is not None:
+                add_to_diag(
+                    self._time_independent_tensor[:self.system_shape[0] - self.site_offset, self.sublattice1,
+                    self.site_offset:,
+                    self.sublattice2], 2 * self._strength)
+                add_to_diag(
+                    self._time_independent_tensor[self.site_offset:, self.sublattice2,
+                    :self.system_shape[2] - self.site_offset,
+                    self.sublattice1], 2 * self.get_transposed_value(self._strength))
+                if self.periodic_bc:
+                    add_to_diag(
+                        self._time_independent_tensor[self.system_shape[0] - self.site_offset:, self.sublattice1,
+                        :self.site_offset,
+                        self.sublattice2], 2 * self._strength)
+                    add_to_diag(
+                        self._time_independent_tensor[:self.site_offset, self.sublattice2,
+                        self.system_shape[2] - self.site_offset:,
+                        self.sublattice1], 2 * self.get_transposed_value(self._strength))
+
 
     @abstractmethod
     def get_zeros_tensor(self):
