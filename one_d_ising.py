@@ -9,24 +9,24 @@ from scipy.linalg import eigh
 from matplotlib import pyplot as plt
 
 
-def gaussian_filter(t, sigma):
-    return 1/(sigma*np.sqrt(2*np.pi))*np.exp(-t**2/(2*sigma**2))
-
-
-def get_g(t: float, g0, T, t1):
-    # return g0 * np.exp(-(t-T/2)**2/(T**2 / 25))
-    return np.maximum(np.minimum(g0 * np.ones_like(t), (1 - np.abs(2 * t / T - 1)) * T / (2 * t1) * g0), 0)
-
-
-def get_B(t: float, B0, B1, T, t1):
-    return np.minimum(np.maximum(B1 * np.ones_like(t), B0 + (B1 - B0) * t / (T - t1)), B0)
-
-
-def get_smoothed_func(t: float, func: Callable,  sigma: float):
-    N = 100
-    ts = np.linspace(-3*sigma, 3*sigma, N)
-    dt = ts[1]-ts[0]
-    return np.sum(np.array(list(map(func,ts+t)))*gaussian_filter(ts,sigma))*dt
+# def gaussian_filter(t, sigma):
+#     return 1/(sigma*np.sqrt(2*np.pi))*np.exp(-t**2/(2*sigma**2))
+#
+#
+# def get_g(t: float, g0, T, t1):
+#     # return g0 * np.exp(-(t-T/2)**2/(T**2 / 25))
+#     return np.maximum(np.minimum(g0 * np.ones_like(t), (1 - np.abs(2 * t / T - 1)) * T / (2 * t1) * g0), 0)
+#
+#
+# def get_B(t: float, B0, B1, T, t1):
+#     return np.minimum(np.maximum(B1 * np.ones_like(t), B0 + (B1 - B0) * t / (T - t1)), B0)
+#
+#
+# def get_smoothed_func(t: float, func: Callable,  sigma: float):
+#     N = 100
+#     ts = np.linspace(-3*sigma, 3*sigma, N)
+#     dt = ts[1]-ts[0]
+#     return np.sum(np.array(list(map(func,ts+t)))*gaussian_filter(ts,sigma))*dt
 
 
 def get_translationally_invariant_hamiltonian(J, h, k, g, B):
