@@ -10,7 +10,7 @@ J = 1.0
 h = 0.5
 V = 0.0
 Ns = 100
-Nt = 100#None
+Nt = None#100,None
 
 results_df = pd.read_csv("results_python_energy_density_vs_cycle.csv")
 
@@ -22,8 +22,8 @@ else:
 
 # results_df = results_df[results_df['T'].isin([12.5,25.,50.,100.,200.,400.,800.])]
 # results_df = results_df[results_df['T'].isin(np.arange(10.,110.,10))]
-results_df = results_df[results_df['T'].isin([10.,20.,30.,40.,50.,60.])]
-# results_df = results_df[results_df['T'].isin([30.,50.,70.,90.])]
+# results_df = results_df[results_df['T'].isin([10.,20.,30.,40.,50.,60.])]
+results_df = results_df[results_df['T'].isin([30.,50.,70.,90.])]
 # results_df = results_df[results_df['T'].isin([10.,20.,40.,100.])]
 
 

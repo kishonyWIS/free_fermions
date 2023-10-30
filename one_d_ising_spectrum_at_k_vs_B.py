@@ -20,6 +20,8 @@ linestyles = itertools.cycle([':','-'])
 linewidths = itertools.cycle([1,None])
 handles = []
 
+plt.figure(figsize=(6,6))
+
 for g in [0, g1]:
 
     B_list = np.linspace(B1, B0, 100)

@@ -7,7 +7,7 @@ import pandas as pd
 
 simulation_mode = "stochastic_schrodinger" #"stochastic_schrodinger" "single_particle"
 trotter_steps = 100
-cycles = 1000
+cycles = 10000
 num_sites = 8
 V_list = [0.0, 0.1]
 

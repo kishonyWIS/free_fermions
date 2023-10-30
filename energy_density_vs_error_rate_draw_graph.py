@@ -6,10 +6,10 @@ import matplotlib as mpl
 import pandas as pd
 import numpy as np
 
-simulation_mode = "stochastic_schrodinger" #"stochastic_schrodinger" "single_particle"
+simulation_mode = "single_particle" #"stochastic_schrodinger" "single_particle"
 trotter_steps = 100
-cycles = 40000
-num_sites = 8
+cycles = 1000
+num_sites = 100
 V = 0.0
 
 if simulation_mode == "stochastic_schrodinger":
@@ -24,6 +24,9 @@ prop_cycle = plt.rcParams['axes.prop_cycle']
 colors = itertools.cycle(prop_cycle.by_key()['color'])
 
 with sns.axes_style("whitegrid"):
+    rc = {"font.family": "serif",
+          "mathtext.fontset": "stix"}
+    plt.rcParams.update(rc)
     plt.rcParams["font.family"] = "Times New Roman"
     plt.figure()
     groups = results_df.groupby(["J", "h"])
@@ -37,7 +40,7 @@ with sns.axes_style("whitegrid"):
         xseq = np.linspace(0, max(group.errors_per_cycle_per_qubit), num=2)
         plt.plot(xseq, a + b * xseq, linestyle='--', color=color, lw=1);
     plt.xlabel('Errors per cycle per qubit', fontsize=str(20), fontname='Times New Roman')#, fontweight='bold')
-    plt.ylabel('Energy density', fontsize=str(20), fontname='Times New Roman')#, fontweight='bold')
+    plt.ylabel('$e_\mathrm{steady}$', fontsize=str(20), fontname='Times New Roman')#, fontweight='bold')
     plt.tick_params(axis='both', which='major', labelsize=15)
     plt.legend(prop=mpl.font_manager.FontProperties(family='Times New Roman', size=15))
     plt.tight_layout()
