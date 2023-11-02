@@ -99,58 +99,39 @@ def get_KSL_model(num_sites_x, num_sites_y, J, kappa, g, B, initial_state):
 
 
 def add_B_term(B, hamiltonian, lattice_shape):
-    add_term_with_offset(name='B_0', strength=-1, hamiltonian=hamiltonian, site_offset=(0, 0), sublattice1=4,
-                         sublattice2=5, lattice_shape=lattice_shape, time_dependence=B)
-    add_term_with_offset(name='B_1', strength=-1, hamiltonian=hamiltonian, site_offset=(0, 0), sublattice1=10,
-                         sublattice2=11, lattice_shape=lattice_shape, time_dependence=B)
-
+    hamiltonian.add_term(name='B_0', strength=-1, sublattice1=4, sublattice2=5, site_offset=(0, 0), time_dependence=B)
+    hamiltonian.add_term(name='B_1', strength=-1, sublattice1=10, sublattice2=11, site_offset=(0, 0), time_dependence=B)
 
 def add_g_term(g, hamiltonian, lattice_shape):
-    add_term_with_offset(name='g_0', strength=-1, hamiltonian=hamiltonian, site_offset=(0, 0), sublattice1=4,
-                         sublattice2=0, lattice_shape=lattice_shape, time_dependence=g)
-    add_term_with_offset(name='g_1', strength=-1, hamiltonian=hamiltonian, site_offset=(0, 0), sublattice1=10,
-                         sublattice2=6, lattice_shape=lattice_shape, time_dependence=g)
-
+    hamiltonian.add_term(name='g_0', strength=-1, sublattice1=4, sublattice2=0, site_offset=(0, 0), time_dependence=g)
+    hamiltonian.add_term(name='g_1', strength=-1, sublattice1=10, sublattice2=6, site_offset=(0, 0), time_dependence=g)
 
 def add_kappa_term(kappa, hamiltonian, lattice_shape):
     site_offset_kappa_x = (1, 0)
     site_offset_kappa_y = (0, 1)
     site_offset_kappa_z = (1, -1)
-    add_term_with_offset(name='kappa_x_0', strength=kappa, hamiltonian=hamiltonian, site_offset=site_offset_kappa_x,
-                         sublattice1=0, sublattice2=0, lattice_shape=lattice_shape)
-    add_term_with_offset(name='kappa_x_1', strength=-kappa, hamiltonian=hamiltonian, site_offset=site_offset_kappa_x,
-                         sublattice1=6, sublattice2=6, lattice_shape=lattice_shape)
-    add_term_with_offset(name='kappa_y_0', strength=-kappa, hamiltonian=hamiltonian, site_offset=site_offset_kappa_y,
-                         sublattice1=0, sublattice2=0, lattice_shape=lattice_shape)
-    add_term_with_offset(name='kappa_y_1', strength=kappa, hamiltonian=hamiltonian, site_offset=site_offset_kappa_y,
-                         sublattice1=6, sublattice2=6, lattice_shape=lattice_shape)
-    add_term_with_offset(name='kappa_z_0', strength=-kappa, hamiltonian=hamiltonian, site_offset=site_offset_kappa_z,
-                         sublattice1=0, sublattice2=0, lattice_shape=lattice_shape)
-    add_term_with_offset(name='kappa_z_1', strength=kappa, hamiltonian=hamiltonian, site_offset=site_offset_kappa_z,
-                         sublattice1=6, sublattice2=6, lattice_shape=lattice_shape)
-
+    hamiltonian.add_term(name='kappa_x_0', strength=kappa, sublattice1=0, sublattice2=0, site_offset=site_offset_kappa_x)
+    hamiltonian.add_term(name='kappa_x_1', strength=-kappa, sublattice1=6, sublattice2=6, site_offset=site_offset_kappa_x)
+    hamiltonian.add_term(name='kappa_y_0', strength=-kappa, sublattice1=0, sublattice2=0, site_offset=site_offset_kappa_y)
+    hamiltonian.add_term(name='kappa_y_1', strength=kappa, sublattice1=6, sublattice2=6, site_offset=site_offset_kappa_y)
+    hamiltonian.add_term(name='kappa_z_0', strength=-kappa, sublattice1=0, sublattice2=0, site_offset=site_offset_kappa_z)
+    hamiltonian.add_term(name='kappa_z_1', strength=kappa, sublattice1=6, sublattice2=6, site_offset=site_offset_kappa_z)
 
 def add_J_term(J, hamiltonian, lattice_shape):
     site_offset_x = (0, 0)
     site_offset_y = (1, 0)
     site_offset_z = (0, 1)
-    add_term_with_offset(name='Jx', strength=-J, hamiltonian=hamiltonian, site_offset=site_offset_x, sublattice1=0,
-                         sublattice2=6, lattice_shape=lattice_shape)
-    add_term_with_offset(name='Jy', strength=J, hamiltonian=hamiltonian, site_offset=site_offset_y, sublattice1=6,
-                         sublattice2=0, lattice_shape=lattice_shape)
-    add_term_with_offset(name='Jz', strength=J, hamiltonian=hamiltonian, site_offset=site_offset_z, sublattice1=6,
-                         sublattice2=0, lattice_shape=lattice_shape)
+    hamiltonian.add_term(name='Jx', strength=-J, sublattice1=0, sublattice2=6, site_offset=site_offset_x)
+    hamiltonian.add_term(name='Jy', strength=J, sublattice1=6, sublattice2=0, site_offset=site_offset_y)
+    hamiltonian.add_term(name='Jz', strength=J, sublattice1=6, sublattice2=0, site_offset=site_offset_z)
 
 def add_gauge_fixing_term(hamiltonian, lattice_shape):
     site_offset_x = (0, 0)
     site_offset_y = (1, 0)
     site_offset_z = (0, 1)
-    add_term_with_offset(name='Gx', strength=-1, hamiltonian=hamiltonian, site_offset=site_offset_x, sublattice1=1,
-                         sublattice2=7, lattice_shape=lattice_shape)
-    add_term_with_offset(name='Gy', strength=1, hamiltonian=hamiltonian, site_offset=site_offset_y, sublattice1=8,
-                         sublattice2=2, lattice_shape=lattice_shape)
-    add_term_with_offset(name='Gz', strength=1, hamiltonian=hamiltonian, site_offset=site_offset_z, sublattice1=9,
-                         sublattice2=3, lattice_shape=lattice_shape)
+    hamiltonian.add_term(name='Gx', strength=-1, sublattice1=1, sublattice2=7, site_offset=site_offset_x)
+    hamiltonian.add_term(name='Gy', strength=1, sublattice1=8, sublattice2=2, site_offset=site_offset_y)
+    hamiltonian.add_term(name='Gz', strength=1, sublattice1=9, sublattice2=3, site_offset=site_offset_z)
 
 
 def add_term_with_offset(name, strength, hamiltonian, site_offset, sublattice1, sublattice2, lattice_shape, time_dependence=None):
@@ -163,12 +144,13 @@ def add_term_with_offset(name, strength, hamiltonian, site_offset, sublattice1, 
         hamiltonian.add_term(name=f'{name}_{site1}', strength=strength_on_site, sublattice1=sublattice1, sublattice2=sublattice2, site1=site1, site2=site2,
                              time_dependence=time_dependence)
 
+
 class KSLState(MajoranaSingleParticleDensityMatrix):
     def reset_all_tau(self):
         self.system_shape[:2]
         for site in np.ndindex(tuple(self.system_shape[:2])):
             self.reset(4, 5, site, site)
-            self.reset(1, 2, site, site)
+            self.reset(10, 11, site, site)
 
 
 

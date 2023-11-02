@@ -129,19 +129,23 @@ class FreeFermionHamiltonianTerm(metaclass=ABCMeta):
                  gauge_site_offset: Optional[Union[int, tuple[int, ...], np.ndarray[int]]] = None,
                  dt: float = None,
                  periodic_bc=False):
+        self.periodic_bc = periodic_bc
         self.system_shape = system_shape
         self.site_offset = np.array(site_offset) if site_offset is not None else None
         self.sublattice1 = sublattice1
         self.sublattice2 = sublattice2
         self.site1 = np.array(site1) if site1 is not None else None
         self.site2 = np.array(site2) if site2 is not None else None
+        if self.site_offset is not None:
+            self.site1, self.site2 = self.offset_to_site1_site2(self.site_offset)
         self.time_dependence = time_dependence
         self.gauge_field = gauge_field
         self.gauge_sublattice1 = gauge_sublattice1
         self.gauge_sublattice2 = gauge_sublattice2
         self.gauge_site_offset = np.array(gauge_site_offset) if gauge_site_offset is not None else None
+        if self.gauge_site_offset is not None:
+            self.gauge_site1, self.gauge_site2 = self.offset_to_site1_site2(self.gauge_site_offset)
         self.dt = dt
-        self.periodic_bc = periodic_bc
         self.strength = strength
 
     @property
@@ -153,30 +157,10 @@ class FreeFermionHamiltonianTerm(metaclass=ABCMeta):
         self._strength = new_strength
         self._time_independent_tensor = self.get_zeros_tensor()
         if self.gauge_field is None:
-            if self.site1 is not None and self.site2 is not None:
-                self._time_independent_tensor[(*self.site1, self.sublattice1, *self.site2, self.sublattice2)] += \
-                    2 * self._strength
-                self._time_independent_tensor[(*self.site2, self.sublattice2, *self.site1, self.sublattice1)] += \
-                    2 * self.get_transposed_value(self._strength)
-            elif self.site_offset is not None:
-                add_to_diag(
-                    self._time_independent_tensor[:self.system_shape[0] - self.site_offset, self.sublattice1,
-                    self.site_offset:,
-                    self.sublattice2], 2 * self._strength)
-                add_to_diag(
-                    self._time_independent_tensor[self.site_offset:, self.sublattice2,
-                    :self.system_shape[2] - self.site_offset,
-                    self.sublattice1], 2 * self.get_transposed_value(self._strength))
-                if self.periodic_bc:
-                    add_to_diag(
-                        self._time_independent_tensor[self.system_shape[0] - self.site_offset:, self.sublattice1,
-                        :self.site_offset,
-                        self.sublattice2], 2 * self._strength)
-                    add_to_diag(
-                        self._time_independent_tensor[:self.site_offset, self.sublattice2,
-                        self.system_shape[2] - self.site_offset:,
-                        self.sublattice1], 2 * self.get_transposed_value(self._strength))
-
+            self._time_independent_tensor[(*self.site1, self.sublattice1, *self.site2, self.sublattice2)] += \
+                2 * self._strength
+            self._time_independent_tensor[(*self.site2, self.sublattice2, *self.site1, self.sublattice1)] += \
+                2 * self.get_transposed_value(self._strength)
 
     @abstractmethod
     def get_zeros_tensor(self):
@@ -191,30 +175,14 @@ class FreeFermionHamiltonianTerm(metaclass=ABCMeta):
         if self.gauge_field is not None:
             # Setting strength to be a gauge field
             self._time_independent_tensor = self.get_zeros_tensor()
-            add_to_diag(
-                self._time_independent_tensor[:self.system_shape[0] - self.site_offset, self.sublattice1,
-                self.site_offset:, self.sublattice2],
-                2 * self._strength * np.diag(self.gauge_field.tensor[:self.system_shape[0] - self.gauge_site_offset,
-                                             self.gauge_sublattice1, self.gauge_site_offset:, self.gauge_sublattice2]))
-            add_to_diag(
-                self._time_independent_tensor[self.site_offset:, self.sublattice2,
-                :self.system_shape[2] - self.site_offset, self.sublattice1],
-                2 * self.get_transposed_value(
-                    self._strength * np.diag(self.gauge_field.tensor[:self.system_shape[0] - self.gauge_site_offset,
-                                             self.gauge_sublattice1, self.gauge_site_offset:, self.gauge_sublattice2])))
-            if self.periodic_bc:
-                add_to_diag(
-                    self._time_independent_tensor[self.system_shape[0] - self.site_offset:, self.sublattice1,
-                    :self.site_offset, self.sublattice2],
-                    2 * self._strength * np.diag(self.gauge_field.tensor[self.system_shape[0] - self.gauge_site_offset:,
-                                                 self.gauge_sublattice1, :self.gauge_site_offset,
-                                                 self.gauge_sublattice2]))
-                add_to_diag(
-                    self._time_independent_tensor[:self.site_offset, self.sublattice2,
-                    self.system_shape[2] - self.site_offset:, self.sublattice1],
-                    2 * self.get_transposed_value(self._strength * np.diag(
-                        self.gauge_field.tensor[self.system_shape[0] - self.gauge_site_offset:,
-                        self.gauge_sublattice1, :self.gauge_site_offset, self.gauge_sublattice2])))
+            self._time_independent_tensor[(*self.site1, self.sublattice1, *self.site2, self.sublattice2)] += \
+                2 * self._strength * self.gauge_field.tensor[(*self.gauge_site1, self.gauge_sublattice1,
+                                                              *self.gauge_site2, self.gauge_sublattice2)]
+            self._time_independent_tensor[(*self.site2, self.sublattice2, *self.site1, self.sublattice1)] += \
+                2 * self.get_transposed_value(self._strength * self.gauge_field.tensor[(*self.gauge_site1,
+                                                                                            self.gauge_sublattice1,
+                                                                                            *self.gauge_site2,
+                                                                                            self.gauge_sublattice2)])
         return self._time_independent_tensor
 
     @property
@@ -235,6 +203,16 @@ class FreeFermionHamiltonianTerm(metaclass=ABCMeta):
     def get_time_dependent_matrix(self, t: float = None) -> np.ndarray:
         return self.apply_time_dependence(self.time_independent_matrix, t)
 
+    def offset_to_site1_site2(self, offset):
+        if self.periodic_bc:
+            sites1 = np.meshgrid(*(np.arange(self.system_shape[dim]) for dim in range(len(offset))),
+                                 indexing='ij')
+        else:
+            sites1 = np.meshgrid(*(np.arange(self.system_shape[dim] - np.abs(offset[dim])) for dim in range(len(offset))),
+                                 indexing='ij')
+        sites1 = [(sites1[dim] + np.abs(offset[dim])*(offset[dim]<0)) % self.system_shape[dim] for dim in range(len(offset))]
+        sites2 = [(sites1[dim] + offset[dim]) % self.system_shape[dim] for dim in range(len(offset))]
+        return sites1, sites2
 
 class MajoranaFreeFermionHamiltonianTerm(FreeFermionHamiltonianTerm):
     """Adds a term sum_on_j{i*strength_j*c_j^sublattice1*c_j+site_offset^sublattice2}
@@ -250,53 +228,25 @@ class MajoranaFreeFermionHamiltonianTerm(FreeFermionHamiltonianTerm):
         time_dependence = 1 if self.time_dependence is None else self.time_dependence(t)
         cos = np.cos(2 * self.strength * time_dependence * self.dt * dt_factor)
         sin = np.sin(2 * self.strength * time_dependence * self.dt * dt_factor)
-        if self.site1 is not None and self.site2 is not None:
+        if self.site1 is not None and self.site2 is not None and self.site_offset is None:
             i1 = site_and_sublattice_to_flat_index(self.site1, self.sublattice1, self.system_shape)
             i2 = site_and_sublattice_to_flat_index(self.site2, self.sublattice2, self.system_shape)
             small_U_2by2 = np.array([[cos, sin], [-sin, cos]])
-            small_U = sparse.eye(np.prod(self.system_shape[:len(self.system_shape)//2]), format='lil')
+            small_U = sparse.eye(matrix_shape, format='lil')
             small_U[np.ix_([i1, i2], [i1, i2])] = small_U_2by2
         elif self.site_offset is not None:
-            diag_terms = np.ones(matrix_shape)
-            diag_terms[np.arange(self.sublattice1, matrix_shape - self.system_shape[1] * self.site_offset,
-                                 self.system_shape[1])] = cos
-            diag_terms[np.arange(self.sublattice2 + self.system_shape[1] * self.site_offset, matrix_shape,
-                                 self.system_shape[1])] = cos
-            upper_diag_offset = self.sublattice2 - self.sublattice1 + self.system_shape[1] * self.site_offset
-            upper_diag_length = matrix_shape - abs(upper_diag_offset)
-            upper_terms = np.zeros(upper_diag_length)
+            small_U = sparse.eye(matrix_shape, format='lil')
+            i1 = site_and_sublattice_to_flat_index(self.site1, self.sublattice1, self.system_shape)
+            i2 = site_and_sublattice_to_flat_index(self.site2, self.sublattice2, self.system_shape)
             if self.gauge_field is None:
                 gauge = 1
             else:
-                gauge = np.diag(self.gauge_field.tensor[:self.system_shape[0] - self.gauge_site_offset,
-                                self.gauge_sublattice1, self.gauge_site_offset:, self.gauge_sublattice2])
-            upper_terms_indexes = np.arange(
-                min(self.sublattice1, self.sublattice2 + self.system_shape[1] * self.site_offset), matrix_shape,
-                self.system_shape[1])
-            upper_terms[upper_terms_indexes[upper_terms_indexes < upper_diag_length]] = sin * gauge
-            if not self.periodic_bc:
-                small_U = sparse.diags([diag_terms, upper_terms, -upper_terms],
-                                       offsets=[0, upper_diag_offset, -upper_diag_offset], format='csr')
-            else:
-                diag_terms[
-                    np.arange(self.sublattice1 + matrix_shape - self.system_shape[1] * self.site_offset, matrix_shape,
-                              self.system_shape[1])] = cos
-                diag_terms[np.arange(self.sublattice2, self.system_shape[1] * self.site_offset,
-                                     self.system_shape[1])] = cos
-                upper_diag_offset_periodic = -np.sign(upper_diag_offset) * (matrix_shape - abs(upper_diag_offset))
-                upper_diag_length_periodic = matrix_shape - abs(upper_diag_offset_periodic)
-                upper_terms_periodic = np.zeros(upper_diag_length_periodic)
-                if self.gauge_field is None:
-                    gauge = 1
-                else:
-                    gauge = np.diag(self.gauge_field.tensor[self.system_shape[0] - self.gauge_site_offset:,
-                                    self.gauge_sublattice1, :self.gauge_site_offset, self.gauge_sublattice2])
-                upper_terms_periodic[
-                    upper_terms_indexes[(upper_terms_indexes >= upper_diag_length)] - upper_diag_length] = sin * gauge
-                small_U = sparse.diags(
-                    [diag_terms, upper_terms, -upper_terms, upper_terms_periodic, -upper_terms_periodic],
-                    offsets=[0, upper_diag_offset, -upper_diag_offset, upper_diag_offset_periodic,
-                             -upper_diag_offset_periodic], format='csr')
+                gauge = self.gauge_field.tensor[(*self.gauge_site1, self.gauge_sublattice1,
+                                                    *self.gauge_site2, self.gauge_sublattice2)]
+            small_U[i1,i1] = cos
+            small_U[i2,i2] = cos
+            small_U[i1,i2] = sin * gauge
+            small_U[i2,i1] = -sin * gauge
         return small_U
 
     def get_zeros_tensor(self):
