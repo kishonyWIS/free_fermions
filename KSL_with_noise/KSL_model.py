@@ -7,50 +7,151 @@ np.random.seed(0)
 
 def get_KSL_model(num_sites_x, num_sites_y, J, kappa, g, B, initial_state):
     # sublattices are numbered c_0, b^1_0, b^2_0, b^3_0, b^4_0, b^5_0, c_1, b^1_1, b^2_1, b^3_1, b^4_1, b^5_1
-    num_sublattices = 12
-    # lattice_shape = (num_sites_x, num_sites_y, num_sublattices)
-    #
-    # system_shape = (num_sites, num_sublattices, num_sites, num_sublattices)
-    # non_gauge_shape = (num_sites, 4, num_sites, 4)
-    # gauge_shape = (num_sites, 2, num_sites, 2)
-    # non_gauge_idxs = np.ix_(range(num_sites), [0, 3, 4, 5], range(num_sites), [0, 3, 4, 5])
-    # gauge_idxs = np.ix_(range(num_sites), [1, 2], range(num_sites), [1, 2])
+    gauge_sublattices = [1, 2, 3, 7, 8, 9]
+    non_gauge_sublattices = [0, 4, 5, 6, 10, 11]
 
+    num_gauge_sublattices = len(gauge_sublattices)
+    num_non_gauge_sublattices = len(non_gauge_sublattices)
+    num_sublattices = num_gauge_sublattices + num_non_gauge_sublattices
+
+    gauge_lattice_shape = (num_sites_x, num_sites_y, num_gauge_sublattices)
+    non_gauge_lattice_shape = (num_sites_x, num_sites_y, num_non_gauge_sublattices)
     lattice_shape = (num_sites_x, num_sites_y, num_sublattices)
+
+    gauge_system_shape = gauge_lattice_shape*2
+    non_gauge_system_shape = non_gauge_lattice_shape*2
     system_shape = lattice_shape*2
 
+    gauge_idxs = np.ix_(range(num_sites_x), range(num_sites_y), gauge_sublattices, range(num_sites_x), range(num_sites_y), gauge_sublattices)
+    non_gauge_idxs = np.ix_(range(num_sites_x), range(num_sites_y), non_gauge_sublattices, range(num_sites_x), range(num_sites_y), non_gauge_sublattices)
+
+    # here!!!!
+
+    decoupled_hamiltonian = MajoranaFreeFermionHamiltonian(system_shape)
+    add_J_term(J, decoupled_hamiltonian, lattice_shape)
+    add_kappa_term(decoupled_hamiltonian, kappa, lattice_shape)
+    decoupled_hamiltonian_matrix = decoupled_hamiltonian.get_matrix()
+    ground_state = decoupled_hamiltonian.get_ground_state()
+    S0_tensor = np.zeros(system_shape)
+
+    if initial_state == 'random':
+        S_non_gauge = KSLState(non_gauge_system_shape)
+        S_non_gauge.randomize()
+        S0_tensor[non_gauge_idxs] = S_non_gauge.tensor
+    elif initial_state == 'ground':
+        S_non_gauge = decoupled_hamiltonian.get_ground_state()
+        S0_tensor[non_gauge_idxs] = S_non_gauge.tensor[non_gauge_idxs]
+
+    gauge_setting_hamiltonian = MajoranaFreeFermionHamiltonian(system_shape)
+    add_gauge_fixing_term(gauge_setting_hamiltonian, lattice_shape)
+
+    S_gauge = gauge_setting_hamiltonian.get_ground_state()
+    S0_tensor[gauge_idxs] = S_gauge.tensor[gauge_idxs]
+    S = KSLState(system_shape=system_shape, tensor=S0_tensor)
+    S.reset_all_tau()
+
     hamiltonian = MajoranaFreeFermionHamiltonian(system_shape)
+    add_J_term(J, hamiltonian, lattice_shape)
+    add_kappa_term(kappa, hamiltonian, lattice_shape)
+    add_g_term(g, hamiltonian, lattice_shape)
+    add_B_term(B, hamiltonian, lattice_shape) #####gauge!!!
+    hamiltonian.add_term(name='J', strength=-J, sublattice1=3, sublattice2=0, site_offset=1,
+                         gauge_field=S, gauge_sublattice1=2, gauge_sublattice2=1, gauge_site_offset=1, periodic_bc=periodic_bc)
+    hamiltonian.add_term(name='g', strength=-1, sublattice1=4, sublattice2=0, site_offset=0, time_dependence=g)
+    hamiltonian.add_term(name='B', strength=-1, sublattice1=4, sublattice2=5, site_offset=0, time_dependence=B)
+    decoupled_hamiltonian_with_gauge = TransverseFieldIsingHamiltonian(system_shape)
+    decoupled_hamiltonian_with_gauge.add_term(name='h', strength=h, sublattice1=3, sublattice2=0, site_offset=0)
+    decoupled_hamiltonian_with_gauge.add_term(name='J', strength=-J, sublattice1=3, sublattice2=0, site_offset=1,
+                                              gauge_field=S, gauge_sublattice1=2, gauge_sublattice2=1,
+                                              gauge_site_offset=1, periodic_bc=periodic_bc)
+    E_gs = ground_state.get_energy(decoupled_hamiltonian_matrix)
 
-    site_offset_x = (0, 0)
-    site_offset_y = (1, 0)
-    site_offset_z = (0, 1)
+    spin_to_fermion_sublattices = {'tau_x': {'sublattice1': 4, 'sublattice2': 0},
+                                   'tau_y': {'sublattice1': 0, 'sublattice2': 5},
+                                   'tau_z': {'sublattice1': 4, 'sublattice2': 5},
+                                   'sigma_x': {'sublattice1': 2, 'sublattice2': 3},
+                                   'sigma_y': {'sublattice1': 1, 'sublattice2': 3},
+                                   'sigma_z': {'sublattice1': 1, 'sublattice2': 2}}
 
+    all_errors_unitaries = {}
+    errors_effect_gauge = {}
+    for name, sublattices in spin_to_fermion_sublattices.items():
+        for i in range(num_sites):
+            all_errors_unitaries[name + '_' + str(i)] = get_fermion_bilinear_unitary(system_shape=system_shape, site1=[i],
+                                                                                     site2=[i], **sublattices)
+            errors_effect_gauge[name + '_' + str(i)] = np.any(
+                [(sublattice in [1, 2]) for sublattice in sublattices.values()])
+
+    return hamiltonian, S, decoupled_hamiltonian_with_gauge, E_gs, all_errors_unitaries, errors_effect_gauge
+    # hamiltonian = MajoranaFreeFermionHamiltonian(system_shape)
+    #
+    # add_J_term(J, hamiltonian, lattice_shape)
+    # add_kappa_term(hamiltonian, kappa, lattice_shape)
+    # add_g_term(g, hamiltonian, lattice_shape)
+    # add_B_term(B, hamiltonian, lattice_shape)
+    #
+    # if initial_state == 'random':
+    #     S = KSLState(system_shape)
+    #     S.randomize()
+    #     S.reset_all_tau()
+    #
+    # return hamiltonian, S
+
+
+def add_B_term(B, hamiltonian, lattice_shape):
+    add_term_with_offset(name='B_0', strength=-1, hamiltonian=hamiltonian, site_offset=(0, 0), sublattice1=4,
+                         sublattice2=5, lattice_shape=lattice_shape, time_dependence=B)
+    add_term_with_offset(name='B_1', strength=-1, hamiltonian=hamiltonian, site_offset=(0, 0), sublattice1=10,
+                         sublattice2=11, lattice_shape=lattice_shape, time_dependence=B)
+
+
+def add_g_term(g, hamiltonian, lattice_shape):
+    add_term_with_offset(name='g_0', strength=-1, hamiltonian=hamiltonian, site_offset=(0, 0), sublattice1=4,
+                         sublattice2=0, lattice_shape=lattice_shape, time_dependence=g)
+    add_term_with_offset(name='g_1', strength=-1, hamiltonian=hamiltonian, site_offset=(0, 0), sublattice1=10,
+                         sublattice2=6, lattice_shape=lattice_shape, time_dependence=g)
+
+
+def add_kappa_term(kappa, hamiltonian, lattice_shape):
     site_offset_kappa_x = (1, 0)
     site_offset_kappa_y = (0, 1)
     site_offset_kappa_z = (1, -1)
+    add_term_with_offset(name='kappa_x_0', strength=kappa, hamiltonian=hamiltonian, site_offset=site_offset_kappa_x,
+                         sublattice1=0, sublattice2=0, lattice_shape=lattice_shape)
+    add_term_with_offset(name='kappa_x_1', strength=-kappa, hamiltonian=hamiltonian, site_offset=site_offset_kappa_x,
+                         sublattice1=6, sublattice2=6, lattice_shape=lattice_shape)
+    add_term_with_offset(name='kappa_y_0', strength=-kappa, hamiltonian=hamiltonian, site_offset=site_offset_kappa_y,
+                         sublattice1=0, sublattice2=0, lattice_shape=lattice_shape)
+    add_term_with_offset(name='kappa_y_1', strength=kappa, hamiltonian=hamiltonian, site_offset=site_offset_kappa_y,
+                         sublattice1=6, sublattice2=6, lattice_shape=lattice_shape)
+    add_term_with_offset(name='kappa_z_0', strength=-kappa, hamiltonian=hamiltonian, site_offset=site_offset_kappa_z,
+                         sublattice1=0, sublattice2=0, lattice_shape=lattice_shape)
+    add_term_with_offset(name='kappa_z_1', strength=kappa, hamiltonian=hamiltonian, site_offset=site_offset_kappa_z,
+                         sublattice1=6, sublattice2=6, lattice_shape=lattice_shape)
 
 
-    add_term_with_offset(name='Jx', strength=-J, hamiltonian=hamiltonian, site_offset=site_offset_x, sublattice1=0, sublattice2=3, lattice_shape=lattice_shape)
-    add_term_with_offset(name='Jy', strength=J, hamiltonian=hamiltonian, site_offset=site_offset_y, sublattice1=3, sublattice2=0, lattice_shape=lattice_shape)
-    add_term_with_offset(name='Jz', strength=J, hamiltonian=hamiltonian, site_offset=site_offset_z, sublattice1=3, sublattice2=0, lattice_shape=lattice_shape)
-    add_term_with_offset(name='kappa_x_0', strength=kappa, hamiltonian=hamiltonian, site_offset=site_offset_kappa_x, sublattice1=0, sublattice2=0, lattice_shape=lattice_shape)
-    add_term_with_offset(name='kappa_x_1', strength=-kappa, hamiltonian=hamiltonian, site_offset=site_offset_kappa_x, sublattice1=3, sublattice2=3, lattice_shape=lattice_shape)
-    add_term_with_offset(name='kappa_y_0', strength=-kappa, hamiltonian=hamiltonian, site_offset=site_offset_kappa_y, sublattice1=0, sublattice2=0, lattice_shape=lattice_shape)
-    add_term_with_offset(name='kappa_y_1', strength=kappa, hamiltonian=hamiltonian, site_offset=site_offset_kappa_y, sublattice1=3, sublattice2=3, lattice_shape=lattice_shape)
-    add_term_with_offset(name='kappa_z_0', strength=-kappa, hamiltonian=hamiltonian, site_offset=site_offset_kappa_z, sublattice1=0, sublattice2=0, lattice_shape=lattice_shape)
-    add_term_with_offset(name='kappa_z_1', strength=kappa, hamiltonian=hamiltonian, site_offset=site_offset_kappa_z, sublattice1=3, sublattice2=3, lattice_shape=lattice_shape)
+def add_J_term(J, hamiltonian, lattice_shape):
+    site_offset_x = (0, 0)
+    site_offset_y = (1, 0)
+    site_offset_z = (0, 1)
+    add_term_with_offset(name='Jx', strength=-J, hamiltonian=hamiltonian, site_offset=site_offset_x, sublattice1=0,
+                         sublattice2=6, lattice_shape=lattice_shape)
+    add_term_with_offset(name='Jy', strength=J, hamiltonian=hamiltonian, site_offset=site_offset_y, sublattice1=6,
+                         sublattice2=0, lattice_shape=lattice_shape)
+    add_term_with_offset(name='Jz', strength=J, hamiltonian=hamiltonian, site_offset=site_offset_z, sublattice1=6,
+                         sublattice2=0, lattice_shape=lattice_shape)
 
-    add_term_with_offset(name='g_0', strength=-1, hamiltonian=hamiltonian, site_offset=(0, 0), sublattice1=1, sublattice2=0, lattice_shape=lattice_shape, time_dependence=g)
-    add_term_with_offset(name='g_1', strength=-1, hamiltonian=hamiltonian, site_offset=(0, 0), sublattice1=4, sublattice2=3, lattice_shape=lattice_shape, time_dependence=g)
-    add_term_with_offset(name='B_0', strength=-1, hamiltonian=hamiltonian, site_offset=(0, 0), sublattice1=1, sublattice2=2, lattice_shape=lattice_shape, time_dependence=B)
-    add_term_with_offset(name='B_1', strength=-1, hamiltonian=hamiltonian, site_offset=(0, 0), sublattice1=4, sublattice2=5, lattice_shape=lattice_shape, time_dependence=B)
+def add_gauge_fixing_term(hamiltonian, lattice_shape):
+    site_offset_x = (0, 0)
+    site_offset_y = (1, 0)
+    site_offset_z = (0, 1)
+    add_term_with_offset(name='Gx', strength=-1, hamiltonian=hamiltonian, site_offset=site_offset_x, sublattice1=1,
+                         sublattice2=7, lattice_shape=lattice_shape)
+    add_term_with_offset(name='Gy', strength=1, hamiltonian=hamiltonian, site_offset=site_offset_y, sublattice1=8,
+                         sublattice2=2, lattice_shape=lattice_shape)
+    add_term_with_offset(name='Gz', strength=1, hamiltonian=hamiltonian, site_offset=site_offset_z, sublattice1=9,
+                         sublattice2=3, lattice_shape=lattice_shape)
 
-    if initial_state == 'random':
-        S = KSLState(system_shape)
-        S.randomize()
-        S.reset_all_tau()
-
-    return hamiltonian, S
 
 def add_term_with_offset(name, strength, hamiltonian, site_offset, sublattice1, sublattice2, lattice_shape, time_dependence=None):
     site_offset = np.array(site_offset)
@@ -92,7 +193,7 @@ if __name__ == '__main__':
     hamiltonian, S = get_KSL_model(num_sites_x, num_sites_y, J, kappa, smoothed_g, smoothed_B, initial_state='random')
     E_gs = hamiltonian.get_ground_state(T).get_energy(hamiltonian.get_matrix(T))
     print(E_gs)
-    # Ud = hamiltonian.full_cycle_unitary_trotterize(0, T, steps=trotter_steps)
+    Ud = hamiltonian.full_cycle_unitary_trotterize(0, T, steps=trotter_steps)
     integration_params = dict(name='vode', nsteps=50000, rtol=1e-12, atol=1e-16)
     Ud = hamiltonian.full_cycle_unitary_faster(integration_params, 0, T)
     print()
