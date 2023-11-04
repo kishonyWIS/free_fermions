@@ -214,6 +214,18 @@ class FreeFermionHamiltonianTerm(metaclass=ABCMeta):
         sites2 = [(sites1[dim] + offset[dim]) % self.system_shape[dim] for dim in range(len(offset))]
         return sites1, sites2
 
+    def filter_site1(self, filter_func):
+        idx_to_keep = filter_func(self.site1)
+        for dim in range(len(self.site1)):
+            self.site1[dim] = self.site1[dim][idx_to_keep]
+            self.site2[dim] = self.site2[dim][idx_to_keep]
+            if self.gauge_field is not None:
+                self.gauge_site1[dim] = self.gauge_site1[dim][idx_to_keep]
+                self.gauge_site2[dim] = self.gauge_site2[dim][idx_to_keep]
+        if isinstance(self.strength, np.ndarray):
+            self.strength = self.strength[idx_to_keep]
+
+
 class MajoranaFreeFermionHamiltonianTerm(FreeFermionHamiltonianTerm):
     """Adds a term sum_on_j{i*strength_j*c_j^sublattice1*c_j+site_offset^sublattice2}
     This term is symmetricized as
@@ -398,7 +410,7 @@ class MajoranaFreeFermionHamiltonian(FreeFermionHamiltonian):
         return Ud
 
     def _unitary_trotterize_run_step(self, Ud, t):
-        for term in self.terms.values():
+        for name, term in self.terms.items():
             Ud = term.small_unitary(t + self.dt / 2) @ Ud
         return Ud
 
