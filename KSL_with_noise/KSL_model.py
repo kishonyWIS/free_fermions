@@ -34,6 +34,7 @@ def get_KSL_model(num_sites_x, num_sites_y, J, kappa, g, B, initial_state):
     decoupled_hamiltonian_matrix = decoupled_hamiltonian.get_matrix()
     ground_state = decoupled_hamiltonian.get_ground_state()
     S0_tensor = np.zeros(system_shape)
+    E_gs = ground_state.get_energy(decoupled_hamiltonian_matrix)
 
     if initial_state == 'random':
         S_non_gauge = KSLState(non_gauge_system_shape)
@@ -53,15 +54,13 @@ def get_KSL_model(num_sites_x, num_sites_y, J, kappa, g, B, initial_state):
 
     hamiltonian = MajoranaFreeFermionHamiltonian(system_shape)
     add_J_term(J, hamiltonian, gauge_field=S)#####gauge!!!
-    add_kappa_term(kappa, hamiltonian)#####gauge!!!
+    add_kappa_term(kappa, hamiltonian, gauge_field=S)#####gauge!!!
     add_g_term(g, hamiltonian)
     add_B_term(B, hamiltonian)
-    # hamiltonian.add_term(name='J', strength=-J, sublattice1=3, sublattice2=0, site_offset=1,
-    #                      gauge_field=S, gauge_sublattice1=2, gauge_sublattice2=1, gauge_site_offset=1, periodic_bc=periodic_bc)
+
     decoupled_hamiltonian_with_gauge = MajoranaFreeFermionHamiltonian(system_shape)
     add_J_term(J, decoupled_hamiltonian_with_gauge, gauge_field=S) #gauge!!!
-    add_kappa_term(kappa, decoupled_hamiltonian_with_gauge) #gauge!!!
-    E_gs = ground_state.get_energy(decoupled_hamiltonian_matrix)
+    add_kappa_term(kappa, decoupled_hamiltonian_with_gauge, gauge_field=S) #gauge!!!
 
     spin_to_fermion_sublattices = {}
     for sublattice_name, sublattice_shift in zip(['A', 'B'], [0, 6]):
@@ -95,33 +94,54 @@ def add_g_term(g, hamiltonian):
     hamiltonian.add_term(name='g_0', strength=-1, sublattice1=4, sublattice2=0, site_offset=(0, 0), time_dependence=g)
     hamiltonian.add_term(name='g_1', strength=-1, sublattice1=10, sublattice2=6, site_offset=(0, 0), time_dependence=g)
 
-def add_kappa_term(kappa, hamiltonian):
-    x_y_z_to_offset = {'x': (1, 0), 'y': (0, 1), 'z': (1, -1)}
-    x_y_z_to_sign = {'x': 1, 'y': -1, 'z': -1}
-    sublattice_name_to_sublattice = {'A': 0, 'B': 6}
-    sublattice_name_to_sign = {'A': 1, 'B': -1}
+def add_kappa_term(kappa, hamiltonian, gauge_field=None):
+    kappa_df = pd.DataFrame(columns=['name', 'x_y_z', 'sublattice_name', 'shift', 'sign', 'sublattice1', 'sublattice2', 'offset', 'gauge_sublattice1', 'gauge_sublattice2', 'gauge_offset1', 'gauge_offset2'])
+    kappa_df['x_y_z'] = ['x', 'y', 'z', 'x', 'y', 'z', 'x', 'y', 'z', 'x', 'y', 'z']
+    kappa_df['sublattice_name'] = ['A', 'A', 'A', 'B', 'B', 'B', 'A', 'A', 'A', 'B', 'B', 'B']
+    kappa_df['shift'] = [0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1 ,1]
+    kappa_df['name'] = 'kappa_' + kappa_df['x_y_z'] + '_sublattice_' + kappa_df['sublattice_name'] + '_shift_' + kappa_df['shift'].astype(str)
+    kappa_df['sign'] = kappa_df['x_y_z'].map({'x': 1, 'y': -1, 'z': -1}) * kappa_df['sublattice_name'].map({'A': 1, 'B': -1})
+    kappa_df['sublattice1'] = kappa_df['sublattice_name'].map({'A': 0, 'B': 6})
+    kappa_df['sublattice2'] = kappa_df['sublattice_name'].map({'A': 0, 'B': 6})
+    kappa_df['offset'] = kappa_df['x_y_z'].map({'x': (1, 0), 'y': (0, 1), 'z': (1, -1)})
+    kappa_df['gauge_sublattice1'] = [[1,8], [1,9], [3,8], [8,1], [9,1], [8,3]] * 2
+    kappa_df['gauge_sublattice2'] = [[7,2], [7,3], [9,2], [2,7], [3,7], [2,9]] * 2
+    kappa_df['gauge_offset1'] = [[(0,0),(0,0)], [(0,0), (0,0)], [(0,0),(0,-1)], [(0,0),(1,0)], [(0,0),(0,1)], [(0,0),(1,0)]] * 2
+    kappa_df['gauge_offset2'] = [[(0,0),(1,0)], [(0,0), (0,1)], [(0,-1),(1,-1)], [(1,0),(1,0)], [(0,1),(0,1)], [(1,0),(1,-1)]] * 2
 
-    for shift in range(2):
-        for x_y_z, offset in x_y_z_to_offset.items():
-            for sublattice_name, sublattice in sublattice_name_to_sublattice.items():
-                sign = x_y_z_to_sign[x_y_z] * sublattice_name_to_sign[sublattice_name]
-                name = 'kappa_' + x_y_z + '_sublattice_' + sublattice_name + '_shift_' + str(shift)
-                hamiltonian.add_term(name=name, strength=kappa*sign, sublattice1=sublattice, sublattice2=sublattice, site_offset=offset)
-                dim_modulation = np.argmax(np.array(offset)!=0)
-                filter_site1 = lambda s1: s1[dim_modulation]*offset[dim_modulation] % 2 == shift
-                hamiltonian.terms[name].filter_site1(filter_site1)
-                print()
+    for row in kappa_df.itertuples():
+        hamiltonian.add_term(name=row.name, strength=kappa*row.sign, sublattice1=row.sublattice1, sublattice2=row.sublattice2, site_offset=row.offset,
+                             gauge_field=gauge_field, gauge_sublattice1=row.gauge_sublattice1, gauge_sublattice2=row.gauge_sublattice2, gauge_site_offset1=row.gauge_offset1, gauge_site_offset2=row.gauge_offset2)
+        dim_modulation = np.argmax(np.array(row.offset)!=0)
+        filter_site1 = lambda s1: s1[dim_modulation]*row.offset[dim_modulation] % 2 == row.shift
+        hamiltonian.terms[row.name].filter_site1(filter_site1)
+
+    # x_y_z_to_offset = {'x': (1, 0), 'y': (0, 1), 'z': (1, -1)}
+    # x_y_z_to_sign = {'x': 1, 'y': -1, 'z': -1}
+    # sublattice_name_to_sublattice = {'A': 0, 'B': 6}
+    # sublattice_name_to_sign = {'A': 1, 'B': -1}
+    #
+    # for shift in range(2):
+    #     for x_y_z, offset in x_y_z_to_offset.items():
+    #         for sublattice_name, sublattice in sublattice_name_to_sublattice.items():
+    #             sign = x_y_z_to_sign[x_y_z] * sublattice_name_to_sign[sublattice_name]
+    #             name = 'kappa_' + x_y_z + '_sublattice_' + sublattice_name + '_shift_' + str(shift)
+    #             hamiltonian.add_term(name=name, strength=kappa*sign, sublattice1=sublattice, sublattice2=sublattice, site_offset=offset,
+    #                                  gauge_field=gauge_field, gauge_sublattice1=gauge_sublattice1, gauge_sublattice2=gauge_sublattice2, gauge_site_offset=gauge_offset)
+    #             dim_modulation = np.argmax(np.array(offset)!=0)
+    #             filter_site1 = lambda s1: s1[dim_modulation]*offset[dim_modulation] % 2 == shift
+    #             hamiltonian.terms[name].filter_site1(filter_site1)
 
 def add_J_term(J, hamiltonian, gauge_field=None):
     site_offset_x = (0, 0)
     site_offset_y = (1, 0)
     site_offset_z = (0, 1)
     hamiltonian.add_term(name='Jx', strength=-J, sublattice1=0, sublattice2=6, site_offset=site_offset_x,
-                         gauge_field=gauge_field, gauge_sublattice1=1, gauge_sublattice2=7, gauge_site_offset=site_offset_x)
+                         gauge_field=gauge_field, gauge_sublattice1=1, gauge_sublattice2=7, gauge_site_offset1=(0,0), gauge_site_offset2=site_offset_x)
     hamiltonian.add_term(name='Jy', strength=J, sublattice1=6, sublattice2=0, site_offset=site_offset_y,
-                         gauge_field=gauge_field, gauge_sublattice1=8, gauge_sublattice2=2, gauge_site_offset=site_offset_y)
+                         gauge_field=gauge_field, gauge_sublattice1=8, gauge_sublattice2=2, gauge_site_offset1=(0,0), gauge_site_offset2=site_offset_y)
     hamiltonian.add_term(name='Jz', strength=J, sublattice1=6, sublattice2=0, site_offset=site_offset_z,
-                         gauge_field=gauge_field, gauge_sublattice1=9, gauge_sublattice2=3, gauge_site_offset=site_offset_z)
+                         gauge_field=gauge_field, gauge_sublattice1=9, gauge_sublattice2=3, gauge_site_offset1=(0,0), gauge_site_offset2=site_offset_z)
 
 def add_gauge_fixing_term(hamiltonian):
     site_offset_x = (0, 0)
@@ -164,7 +184,7 @@ if __name__ == '__main__':
     B1 = 0.
     B0 = 5.
     J = 1.
-    kappa = 0.0
+    kappa = 0.1
     periodic_bc = False
 
     cycles = 50

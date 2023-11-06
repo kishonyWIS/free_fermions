@@ -126,7 +126,8 @@ class FreeFermionHamiltonianTerm(metaclass=ABCMeta):
                  gauge_field: Optional[MajoranaSingleParticleDensityMatrix] = None,
                  gauge_sublattice1: Optional[int] = None,
                  gauge_sublattice2: Optional[int] = None,
-                 gauge_site_offset: Optional[Union[int, tuple[int, ...], np.ndarray[int]]] = None,
+                 gauge_site_offset1: Optional[Union[int, tuple[int, ...], np.ndarray[int]]] = None,
+                 gauge_site_offset2: Optional[Union[int, tuple[int, ...], np.ndarray[int]]] = None,
                  dt: float = None,
                  periodic_bc=False):
         self.periodic_bc = periodic_bc
@@ -136,15 +137,19 @@ class FreeFermionHamiltonianTerm(metaclass=ABCMeta):
         self.sublattice2 = sublattice2
         self.site1 = np.array(site1) if site1 is not None else None
         self.site2 = np.array(site2) if site2 is not None else None
+        self.dims = len(self.system_shape) // 2 - 1
         if self.site_offset is not None:
             self.site1, self.site2 = self.offset_to_site1_site2(self.site_offset)
         self.time_dependence = time_dependence
         self.gauge_field = gauge_field
-        self.gauge_sublattice1 = gauge_sublattice1
-        self.gauge_sublattice2 = gauge_sublattice2
-        self.gauge_site_offset = np.array(gauge_site_offset) if gauge_site_offset is not None else None
-        if self.gauge_site_offset is not None:
-            self.gauge_site1, self.gauge_site2 = self.offset_to_site1_site2(self.gauge_site_offset)
+        if self.gauge_field is not None:
+            self.gauge_sublattice1 = np.array(gauge_sublattice1).reshape(-1)
+            self.gauge_sublattice2 = np.array(gauge_sublattice2).reshape(-1)
+            self.num_gauge_terms = len(self.gauge_sublattice1)
+            self.gauge_site_offset1 = np.array(gauge_site_offset1).reshape(self.num_gauge_terms, -1)
+            self.gauge_site_offset2 = np.array(gauge_site_offset2).reshape(self.num_gauge_terms, -1)
+            self.gauge_site1 = [self.shift_sites_by_offset(self.site1, self.gauge_site_offset1[i,:]) for i in range(self.num_gauge_terms)]
+            self.gauge_site2 = [self.shift_sites_by_offset(self.site1, self.gauge_site_offset2[i,:]) for i in range(self.num_gauge_terms)]
         self.dt = dt
         self.strength = strength
 
@@ -175,14 +180,12 @@ class FreeFermionHamiltonianTerm(metaclass=ABCMeta):
         if self.gauge_field is not None:
             # Setting strength to be a gauge field
             self._time_independent_tensor = self.get_zeros_tensor()
-            self._time_independent_tensor[(*self.site1, self.sublattice1, *self.site2, self.sublattice2)] += \
-                2 * self._strength * self.gauge_field.tensor[(*self.gauge_site1, self.gauge_sublattice1,
-                                                              *self.gauge_site2, self.gauge_sublattice2)]
-            self._time_independent_tensor[(*self.site2, self.sublattice2, *self.site1, self.sublattice1)] += \
-                2 * self.get_transposed_value(self._strength * self.gauge_field.tensor[(*self.gauge_site1,
-                                                                                            self.gauge_sublattice1,
-                                                                                            *self.gauge_site2,
-                                                                                            self.gauge_sublattice2)])
+            values_to_add = 2 * self._strength
+            for i_gauge_term in range(self.num_gauge_terms):
+                values_to_add *= self.gauge_field.tensor[(*self.gauge_site1[i_gauge_term], self.gauge_sublattice1[i_gauge_term],
+                                                            *self.gauge_site2[i_gauge_term], self.gauge_sublattice2[i_gauge_term])]
+            self._time_independent_tensor[(*self.site1, self.sublattice1, *self.site2, self.sublattice2)] += values_to_add
+            self._time_independent_tensor[(*self.site2, self.sublattice2, *self.site1, self.sublattice1)] += self.get_transposed_value(values_to_add)
         return self._time_independent_tensor
 
     @property
@@ -205,23 +208,26 @@ class FreeFermionHamiltonianTerm(metaclass=ABCMeta):
 
     def offset_to_site1_site2(self, offset):
         if self.periodic_bc:
-            sites1 = np.meshgrid(*(np.arange(self.system_shape[dim]) for dim in range(len(offset))),
+            sites1 = np.meshgrid(*(np.arange(self.system_shape[dim]) for dim in range(self.dims)),
                                  indexing='ij')
         else:
-            sites1 = np.meshgrid(*(np.arange(self.system_shape[dim] - np.abs(offset[dim])) for dim in range(len(offset))),
+            sites1 = np.meshgrid(*(np.arange(self.system_shape[dim] - np.abs(offset[dim])) for dim in range(self.dims)),
                                  indexing='ij')
-        sites1 = [(sites1[dim] + np.abs(offset[dim])*(offset[dim]<0)) % self.system_shape[dim] for dim in range(len(offset))]
-        sites2 = [(sites1[dim] + offset[dim]) % self.system_shape[dim] for dim in range(len(offset))]
+        sites1 = self.shift_sites_by_offset(sites1, np.abs(offset)*(offset<0))
+        sites2 = self.shift_sites_by_offset(sites1, offset)
         return sites1, sites2
+
+    def shift_sites_by_offset(self, sites, offset):
+        return np.array([(sites[dim] + offset[dim]) % self.system_shape[dim] for dim in range(self.dims)])
 
     def filter_site1(self, filter_func):
         idx_to_keep = filter_func(self.site1)
-        for dim in range(len(self.site1)):
-            self.site1[dim] = self.site1[dim][idx_to_keep]
-            self.site2[dim] = self.site2[dim][idx_to_keep]
-            if self.gauge_field is not None:
-                self.gauge_site1[dim] = self.gauge_site1[dim][idx_to_keep]
-                self.gauge_site2[dim] = self.gauge_site2[dim][idx_to_keep]
+        self.site1 = self.site1[:,idx_to_keep]
+        self.site2 = self.site2[:,idx_to_keep]
+        if self.gauge_field is not None:
+            for i_gauge_term in range(self.num_gauge_terms):
+                self.gauge_site1[i_gauge_term] = self.gauge_site1[i_gauge_term][:,idx_to_keep]
+                self.gauge_site2[i_gauge_term] = self.gauge_site2[i_gauge_term][:,idx_to_keep]
         if isinstance(self.strength, np.ndarray):
             self.strength = self.strength[idx_to_keep]
 
@@ -250,11 +256,11 @@ class MajoranaFreeFermionHamiltonianTerm(FreeFermionHamiltonianTerm):
             small_U = sparse.eye(matrix_shape, format='lil')
             i1 = site_and_sublattice_to_flat_index(self.site1, self.sublattice1, self.system_shape)
             i2 = site_and_sublattice_to_flat_index(self.site2, self.sublattice2, self.system_shape)
-            if self.gauge_field is None:
-                gauge = 1
-            else:
-                gauge = self.gauge_field.tensor[(*self.gauge_site1, self.gauge_sublattice1,
-                                                    *self.gauge_site2, self.gauge_sublattice2)]
+            gauge = 1
+            if self.gauge_field is not None:
+                for i_gauge_term in range(self.num_gauge_terms):
+                    gauge *= self.gauge_field.tensor[(*self.gauge_site1[i_gauge_term], self.gauge_sublattice1[i_gauge_term],
+                                                        *self.gauge_site2[i_gauge_term], self.gauge_sublattice2[i_gauge_term])]
             small_U[i1,i1] = cos
             small_U[i2,i2] = cos
             small_U[i1,i2] = sin * gauge
