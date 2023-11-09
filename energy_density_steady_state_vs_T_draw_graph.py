@@ -40,7 +40,7 @@ with sns.axes_style("whitegrid"):
         for T, group_T in groups_T:
             group_T = group_T[group_T.Nt == group_T.Nt.max()]
             T_list.append(T)
-            energy_density_list.append(group_T.energy_density.min())
+            energy_density_list.append(group_T.energy_density_spatial.min())
         plt.semilogy(T_list, energy_density_list, linestyle='-', marker=marker, color=color, label=f'{Ns}')
     plt.xlabel('$T$', fontsize='20', fontname='Times New Roman')#, fontweight='bold')
     plt.ylabel('Energy density', fontsize='20', fontname='Times New Roman')#, fontweight='bold')

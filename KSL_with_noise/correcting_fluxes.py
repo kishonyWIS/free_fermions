@@ -7,8 +7,8 @@ class KSL_flux_corrector:
     def __init__(self, n_sites_x, n_sites_y, periodic_bc=False):
         self.n_sites_x = n_sites_x
         self.n_sites_y = n_sites_y
-        H = np.zeros((4,2*n_sites_x*n_sites_y*3))
-        relative_op_indexes = np.array([3*1+1, 3*1+2, 3*2+0, 3*2+2, 3*3+0, 3*3+1, 3*6+0, 3*6+1, 3*7+0, 3*7+2, 3*8+1, 3*8+2])
+        H = np.zeros(((n_sites_x-1)*(n_sites_y-1), 2*n_sites_x*n_sites_y*3))
+        relative_op_indexes = np.array([3*1+1, 3*1+2, 3*2+0, 3*2+2, 3*3+0, 3*3+1, 3*(n_sites_y*2)+0, 3*(n_sites_y*2)+1, 3*(n_sites_y*2+1)+0, 3*(n_sites_y*2+1)+2, 3*(n_sites_y*2+2)+1, 3*(n_sites_y*2+2)+2])
         for i_hex, (x_shift, y_shift) in enumerate(product(range(n_sites_x-1), range(n_sites_y-1))):
             H[i_hex,3*2*y_shift + 3*2*x_shift*n_sites_y + relative_op_indexes]=1
         H = sparse.csc_matrix(H)

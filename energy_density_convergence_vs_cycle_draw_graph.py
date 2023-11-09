@@ -46,8 +46,8 @@ with sns.axes_style("whitegrid"):
         color = next(colors)
         group = group[group.Nt == group.Nt.max()]
         group_up_to_5_cycles = group.query("N_iter<=5")
-        steady_state_energy_density[T] = group.energy_density.min()
-        energy_above_steady_state = group_up_to_5_cycles.energy_density-steady_state_energy_density[T]
+        steady_state_energy_density[T] = group.energy_density_spatial.min()
+        energy_above_steady_state = group_up_to_5_cycles.energy_density_spatial - steady_state_energy_density[T]
 
         # remove zeros
         N_iter = group_up_to_5_cycles.N_iter[energy_above_steady_state>0]

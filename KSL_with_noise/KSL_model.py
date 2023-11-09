@@ -6,7 +6,60 @@ from free_fermion_hamiltonian import MajoranaFreeFermionHamiltonian, MajoranaSin
 from matplotlib import pyplot as plt
 import pandas as pd
 from time_dependence_functions import get_g, get_B
+from space_resolved_energy import get_spacial_energy_density
 np.random.seed(0)
+
+
+class KSLHamiltonian(MajoranaFreeFermionHamiltonian):
+    def __init__(self, system_shape, **kwargs):
+        super().__init__(system_shape, **kwargs)
+        self._small_unitary_dict = {}
+        self.dt_factor = 0.5
+
+    def small_unitary(self, term_name, t):
+        if self.terms[term_name].time_dependence is not None:
+            return self.terms[term_name].small_unitary(t, dt_factor=self.dt_factor)
+        else:
+            if term_name not in self._small_unitary_dict:
+                self._small_unitary_dict[term_name] = self.terms[term_name].small_unitary(t, dt_factor=self.dt_factor)
+            return self._small_unitary_dict[term_name]
+
+    def set_new_gauge(self):
+        for term_name, term in self.terms.items():
+            if ((term.gauge_field is not None or term_name not in self._small_unitary_dict)
+                    and term.time_dependence is None):
+                self._small_unitary_dict[term_name] = term.small_unitary(None, dt_factor=self.dt_factor)
+
+    # def _unitary_trotterize_run_step(self, Ud, t):
+    #     for term_name in self.terms:
+    #         Ud = self.small_unitary(term_name, t + self.dt / 2) @ Ud
+    #     return Ud
+
+    def _unitary_trotterize_run_step(self, Ud, t):
+        Jx = self.small_unitary('Jx', t + self.dt / 2)
+        Jy = self.small_unitary('Jy', t + self.dt / 2)
+        Jz = self.small_unitary('Jz', t + self.dt / 2)
+        kappa_x_A_0 = self.small_unitary('kappa_x_sublattice_A_shift_0', t + self.dt / 2)
+        kappa_y_A_0 = self.small_unitary('kappa_y_sublattice_A_shift_0', t + self.dt / 2)
+        kappa_z_A_0 = self.small_unitary('kappa_z_sublattice_A_shift_0', t + self.dt / 2)
+        kappa_x_B_0 = self.small_unitary('kappa_x_sublattice_B_shift_0', t + self.dt / 2)
+        kappa_y_B_0 = self.small_unitary('kappa_y_sublattice_B_shift_0', t + self.dt / 2)
+        kappa_z_B_0 = self.small_unitary('kappa_z_sublattice_B_shift_0', t + self.dt / 2)
+        kappa_x_A_1 = self.small_unitary('kappa_x_sublattice_A_shift_1', t + self.dt / 2)
+        kappa_y_A_1 = self.small_unitary('kappa_y_sublattice_A_shift_1', t + self.dt / 2)
+        kappa_z_A_1 = self.small_unitary('kappa_z_sublattice_A_shift_1', t + self.dt / 2)
+        kappa_x_B_1 = self.small_unitary('kappa_x_sublattice_B_shift_1', t + self.dt / 2)
+        kappa_y_B_1 = self.small_unitary('kappa_y_sublattice_B_shift_1', t + self.dt / 2)
+        kappa_z_B_1 = self.small_unitary('kappa_z_sublattice_B_shift_1', t + self.dt / 2)
+        g_0 = self.small_unitary('g_0', t + self.dt / 2)
+        g_1 = self.small_unitary('g_1', t + self.dt / 2)
+        B_0 = self.small_unitary('B_0', t + self.dt / 2)
+        B_1 = self.small_unitary('B_1', t + self.dt / 2)
+        small_U = B_0 @ B_1 @ Jx @ g_0 @ g_1 @ kappa_x_A_0 @ kappa_x_B_0 @ kappa_x_A_1 @ kappa_x_B_1 @ kappa_y_A_0 @ kappa_y_B_0 @ kappa_y_A_1 @ kappa_y_B_1 @ kappa_z_A_0 @ kappa_z_B_0 @ kappa_z_A_1 @ kappa_z_B_1 @ Jy @ Jz
+        small_U_reversed = Jz @ Jy @ kappa_z_B_1 @ kappa_z_A_1 @ kappa_z_B_0 @ kappa_z_A_0 @ kappa_y_B_1 @ kappa_y_A_1 @ kappa_y_B_0 @ kappa_y_A_0 @ kappa_x_B_1 @ kappa_x_A_1 @ kappa_x_B_0 @ kappa_x_A_0 @ g_1 @ g_0 @ Jx @ B_1 @ B_0
+        Ud = (small_U @ small_U_reversed) @ Ud
+        return Ud
+
 
 def get_KSL_model(num_sites_x, num_sites_y, J, kappa, g, B, initial_state):
     # sublattices are numbered c_0, b^1_0, b^2_0, b^3_0, b^4_0, b^5_0, c_1, b^1_1, b^2_1, b^3_1, b^4_1, b^5_1
@@ -28,7 +81,7 @@ def get_KSL_model(num_sites_x, num_sites_y, J, kappa, g, B, initial_state):
     gauge_idxs = np.ix_(range(num_sites_x), range(num_sites_y), gauge_sublattices, range(num_sites_x), range(num_sites_y), gauge_sublattices)
     non_gauge_idxs = np.ix_(range(num_sites_x), range(num_sites_y), non_gauge_sublattices, range(num_sites_x), range(num_sites_y), non_gauge_sublattices)
 
-    decoupled_hamiltonian = MajoranaFreeFermionHamiltonian(system_shape)
+    decoupled_hamiltonian = KSLHamiltonian(system_shape)
     add_J_term(J, decoupled_hamiltonian)
     add_kappa_term(kappa, decoupled_hamiltonian)
     decoupled_hamiltonian_matrix = decoupled_hamiltonian.get_matrix()
@@ -44,7 +97,7 @@ def get_KSL_model(num_sites_x, num_sites_y, J, kappa, g, B, initial_state):
         S_non_gauge = ground_state
         S0_tensor[non_gauge_idxs] = S_non_gauge.tensor[non_gauge_idxs]
 
-    gauge_setting_hamiltonian = MajoranaFreeFermionHamiltonian(system_shape)
+    gauge_setting_hamiltonian = KSLHamiltonian(system_shape)
     add_gauge_fixing_term(gauge_setting_hamiltonian)
 
     S_gauge = gauge_setting_hamiltonian.get_ground_state()
@@ -52,13 +105,13 @@ def get_KSL_model(num_sites_x, num_sites_y, J, kappa, g, B, initial_state):
     S = KSLState(system_shape=system_shape, tensor=S0_tensor)
     S.reset_all_tau()
 
-    hamiltonian = MajoranaFreeFermionHamiltonian(system_shape)
+    hamiltonian = KSLHamiltonian(system_shape)
     add_J_term(J, hamiltonian, gauge_field=S)#####gauge!!!
     add_kappa_term(kappa, hamiltonian, gauge_field=S)#####gauge!!!
     add_g_term(g, hamiltonian)
     add_B_term(B, hamiltonian)
 
-    decoupled_hamiltonian_with_gauge = MajoranaFreeFermionHamiltonian(system_shape)
+    decoupled_hamiltonian_with_gauge = KSLHamiltonian(system_shape)
     add_J_term(J, decoupled_hamiltonian_with_gauge, gauge_field=S) #gauge!!!
     add_kappa_term(kappa, decoupled_hamiltonian_with_gauge, gauge_field=S) #gauge!!!
 
@@ -104,33 +157,17 @@ def add_kappa_term(kappa, hamiltonian, gauge_field=None):
     kappa_df['sublattice1'] = kappa_df['sublattice_name'].map({'A': 0, 'B': 6})
     kappa_df['sublattice2'] = kappa_df['sublattice_name'].map({'A': 0, 'B': 6})
     kappa_df['offset'] = kappa_df['x_y_z'].map({'x': (1, 0), 'y': (0, 1), 'z': (1, -1)})
-    kappa_df['gauge_sublattice1'] = [[1,8], [1,9], [3,8], [8,1], [9,1], [8,3]] * 2
-    kappa_df['gauge_sublattice2'] = [[7,2], [7,3], [9,2], [2,7], [3,7], [2,9]] * 2
-    kappa_df['gauge_offset1'] = [[(0,0),(0,0)], [(0,0), (0,0)], [(0,0),(0,-1)], [(0,0),(1,0)], [(0,0),(0,1)], [(0,0),(1,0)]] * 2
-    kappa_df['gauge_offset2'] = [[(0,0),(1,0)], [(0,0), (0,1)], [(0,-1),(1,-1)], [(1,0),(1,0)], [(0,1),(0,1)], [(1,0),(1,-1)]] * 2
+    kappa_df['gauge_sublattice1'] = [[1,2], [1,3], [3,2], [2,1], [3,1], [2,3]] * 2
+    kappa_df['gauge_sublattice2'] = [[7,8], [7,9], [9,8], [8,7], [9,7], [8,9]] * 2
+    kappa_df['gauge_offset1'] = [[(0,0),(1,0)], [(0,0), (0,1)], [(0,0),(1,-1)], [(1,0),(1,0)], [(0,1),(0,1)], [(1,0),(1,0)]] * 2
+    kappa_df['gauge_offset2'] = [[(0,0),(0,0)], [(0,0), (0,0)], [(0,-1),(0,-1)], [(0,0),(1,0)], [(0,0),(0,1)], [(0,0),(1,-1)]] * 2
 
     for row in kappa_df.itertuples():
         hamiltonian.add_term(name=row.name, strength=kappa*row.sign, sublattice1=row.sublattice1, sublattice2=row.sublattice2, site_offset=row.offset,
                              gauge_field=gauge_field, gauge_sublattice1=row.gauge_sublattice1, gauge_sublattice2=row.gauge_sublattice2, gauge_site_offset1=row.gauge_offset1, gauge_site_offset2=row.gauge_offset2)
         dim_modulation = np.argmax(np.array(row.offset)!=0)
-        filter_site1 = lambda s1: s1[dim_modulation]*row.offset[dim_modulation] % 2 == row.shift
+        filter_site1 = lambda s1: (s1[dim_modulation]*row.offset[dim_modulation]) % 2 == row.shift
         hamiltonian.terms[row.name].filter_site1(filter_site1)
-
-    # x_y_z_to_offset = {'x': (1, 0), 'y': (0, 1), 'z': (1, -1)}
-    # x_y_z_to_sign = {'x': 1, 'y': -1, 'z': -1}
-    # sublattice_name_to_sublattice = {'A': 0, 'B': 6}
-    # sublattice_name_to_sign = {'A': 1, 'B': -1}
-    #
-    # for shift in range(2):
-    #     for x_y_z, offset in x_y_z_to_offset.items():
-    #         for sublattice_name, sublattice in sublattice_name_to_sublattice.items():
-    #             sign = x_y_z_to_sign[x_y_z] * sublattice_name_to_sign[sublattice_name]
-    #             name = 'kappa_' + x_y_z + '_sublattice_' + sublattice_name + '_shift_' + str(shift)
-    #             hamiltonian.add_term(name=name, strength=kappa*sign, sublattice1=sublattice, sublattice2=sublattice, site_offset=offset,
-    #                                  gauge_field=gauge_field, gauge_sublattice1=gauge_sublattice1, gauge_sublattice2=gauge_sublattice2, gauge_site_offset=gauge_offset)
-    #             dim_modulation = np.argmax(np.array(offset)!=0)
-    #             filter_site1 = lambda s1: s1[dim_modulation]*offset[dim_modulation] % 2 == shift
-    #             hamiltonian.terms[name].filter_site1(filter_site1)
 
 def add_J_term(J, hamiltonian, gauge_field=None):
     site_offset_x = (0, 0)
@@ -139,9 +176,9 @@ def add_J_term(J, hamiltonian, gauge_field=None):
     hamiltonian.add_term(name='Jx', strength=-J, sublattice1=0, sublattice2=6, site_offset=site_offset_x,
                          gauge_field=gauge_field, gauge_sublattice1=1, gauge_sublattice2=7, gauge_site_offset1=(0,0), gauge_site_offset2=site_offset_x)
     hamiltonian.add_term(name='Jy', strength=J, sublattice1=6, sublattice2=0, site_offset=site_offset_y,
-                         gauge_field=gauge_field, gauge_sublattice1=8, gauge_sublattice2=2, gauge_site_offset1=(0,0), gauge_site_offset2=site_offset_y)
+                         gauge_field=gauge_field, gauge_sublattice1=2, gauge_sublattice2=8, gauge_site_offset1=site_offset_y, gauge_site_offset2=(0,0))
     hamiltonian.add_term(name='Jz', strength=J, sublattice1=6, sublattice2=0, site_offset=site_offset_z,
-                         gauge_field=gauge_field, gauge_sublattice1=9, gauge_sublattice2=3, gauge_site_offset1=(0,0), gauge_site_offset2=site_offset_z)
+                         gauge_field=gauge_field, gauge_sublattice1=3, gauge_sublattice2=9, gauge_site_offset1=site_offset_z, gauge_site_offset2=(0,0))
 
 def add_gauge_fixing_term(hamiltonian):
     site_offset_x = (0, 0)
@@ -177,54 +214,15 @@ class KSLState(MajoranaSingleParticleDensityMatrix):
         return fluxes
 
 
-if __name__ == '__main__':
-    num_sites_x = 3
-    num_sites_y = 3
-    g0 = 0.5
-    B1 = 0.
-    B0 = 5.
-    J = 1.
-    kappa = 0.1
-    periodic_bc = False
-
-    cycles = 50
-
-    trotter_steps = 2000
-
-    T = 90.
-    t1 = T / 4
-    smoothed_g = lambda t: get_g(t, g0, T, t1)
-    smoothed_B = lambda t: get_B(t, B0, B1, T)
-
-    flux_corrector = KSL_flux_corrector(num_sites_x, num_sites_y, periodic_bc)
-
+def cool_KSL(num_sites_x, num_sites_y, J, kappa, smoothed_g, smoothed_B, initial_state, periodic_bc, cycles, errors_per_cycle, trotter_steps, T, flux_corrector):
     hamiltonian, S, decoupled_hamiltonian_with_gauge, E_gs, all_errors_unitaries, errors_effect_gauge = \
-        get_KSL_model(num_sites_x, num_sites_y, J, kappa, smoothed_g, smoothed_B, initial_state='random')
-
-    print(E_gs)
-
+        get_KSL_model(num_sites_x, num_sites_y, J, kappa, smoothed_g, smoothed_B, initial_state=initial_state)
     Ud = hamiltonian.full_cycle_unitary_trotterize(0, T, steps=trotter_steps)
-    # integration_params = dict(name='vode', nsteps=50000, rtol=1e-12, atol=1e-16)
-    # Ud = hamiltonian.full_cycle_unitary_faster(integration_params, 0, T)
-
-    errors_per_cycle_per_qubit = 1e-100
-    errors_per_cycle = errors_per_cycle_per_qubit * num_sites_x * num_sites_y * 4
-    errors_per_cycle = 0.3
-
     Es = []
     cycle = 0
     time_to_error = np.random.exponential(T / errors_per_cycle)
     time_in_current_cycle = 0.
-
     Es.append(S.get_energy(decoupled_hamiltonian_with_gauge.get_matrix()))
-    # new_row = pd.DataFrame(
-    #     {'Ns': num_sites, 'periodic_bc': periodic_bc, 'drop_one_g_for_odd_bath_signs': False, 'J': J,
-    #      'h': h, 'V': 0, 'T': T, 'Nt': trotter_steps, 'N_iter': cycle,
-    #      'errors_per_cycle_per_qubit': error_rate, 'energy_density': (Es[-1] - E_gs) / num_sites},
-    #     index=[0])
-    # results_df = pd.concat([results_df, new_row], ignore_index=True)
-
-
     while True:
         if cycle == cycles:
             # finished all cycles
@@ -237,6 +235,7 @@ if __name__ == '__main__':
             if errors_effect_gauge[error_name]:
                 # print('recalculating Ud')
                 # Ud = hamiltonian.full_cycle_unitary_faster(integration_params, 0, T)
+                hamiltonian.set_new_gauge()
                 Ud = hamiltonian.full_cycle_unitary_trotterize(0, T, steps=trotter_steps)
             time_to_error = np.random.exponential(T / errors_per_cycle)
         elif time_to_error > T and time_in_current_cycle == 0:
@@ -264,25 +263,18 @@ if __name__ == '__main__':
             Es.append(S.get_energy(decoupled_hamiltonian_with_gauge.get_matrix()))
 
             # correct fluxes
-            # fluxes = S.fluxes(periodic_bc)
-            # correction_names = flux_corrector.correct(fluxes)
-            # for correction_name in correction_names:
-            #     S.evolve_with_unitary(all_errors_unitaries[correction_name])
-            # if any(errors_effect_gauge[correction_name] for correction_name in correction_names):
-            #     Ud = hamiltonian.full_cycle_unitary_trotterize(0, T, steps=trotter_steps)
+            fluxes = S.fluxes(periodic_bc)
+            correction_names = flux_corrector.correct(fluxes)
+            for correction_name in correction_names:
+                S.evolve_with_unitary(all_errors_unitaries[correction_name])
+            if any(errors_effect_gauge[correction_name] for correction_name in correction_names):
+                hamiltonian.set_new_gauge()
+                Ud = hamiltonian.full_cycle_unitary_trotterize(0, T, steps=trotter_steps)
 
             time_in_current_cycle = 0
-            # new_row = pd.DataFrame(
-            #     {'Ns': num_sites, 'periodic_bc': periodic_bc, 'drop_one_g_for_odd_bath_signs': False, 'J': J,
-            #      'h': h, 'V': 0, 'T': T, 'Nt': trotter_steps, 'N_iter': cycle,
-            #      'errors_per_cycle_per_qubit': error_rate, 'energy_density': (Es[-1] - E_gs) / num_sites},
-            #     index=[0])
-            # results_df = pd.concat([results_df, new_row], ignore_index=True)
+
         elif time_in_current_cycle > 0:
             # print('finish incomplete cycle')
-            # Ud_temp = hamiltonian.full_cycle_unitary_faster(integration_params,
-            #                                                 time_in_current_cycle,
-            #                                                 T)
             steps = int(trotter_steps * (T - time_in_current_cycle) / T)
             if steps > 0:
                 Ud_temp = hamiltonian.full_cycle_unitary_trotterize(time_in_current_cycle, T, steps=steps)
@@ -292,11 +284,83 @@ if __name__ == '__main__':
         else:
             raise 'invalid cycle state'
 
-    print(Es[-1])
-    print('ground state energy = ' + str(E_gs))
-    plt.figure()
-    plt.semilogy(np.arange(len(Es))+1, (Es-E_gs)/num_sites_x/num_sites_y)
-    plt.show()
+    return np.array(Es)-E_gs, S, hamiltonian
 
 
+if __name__ == '__main__':
+    num_sites_x = 11
+    num_sites_y = 11
+    g0 = 0.5
+    B1 = 0.
+    B0 = 5.
+    J = 1.
+    kappa = 0.1
+    periodic_bc = False
+    cycles_averaging_buffer = 3
+    initial_state = "ground"
 
+    cycles = 50
+
+    trotter_steps = 100
+
+    T_list = [20.]
+
+    for T in T_list:
+
+        t1 = T / 4
+        smoothed_g = lambda t: get_g(t, g0, T, t1)
+        smoothed_B = lambda t: get_B(t, B0, B1, T)
+
+        flux_corrector = KSL_flux_corrector(num_sites_x, num_sites_y, periodic_bc)
+
+        errors_per_cycle_per_qubit = np.linspace(1e-99, 0.02, 10) #[1e-99], np.linspace(1e-99, 0.02, 10)
+
+        for error_rate in errors_per_cycle_per_qubit:
+
+            errors_per_cycle = error_rate * num_sites_x * num_sites_y * 4
+
+            energy_above_ground, S, hamiltonian = cool_KSL(num_sites_x, num_sites_y, J, kappa, smoothed_g, smoothed_B, initial_state=initial_state, periodic_bc=periodic_bc, cycles=cycles, errors_per_cycle=errors_per_cycle, trotter_steps=trotter_steps, T=T, flux_corrector=flux_corrector)
+
+            columns_averaged = ["num_sites_x", "num_sites_y", "periodic_bc", "J", "kappa", "g", "B", "T", "Nt", "N_iter",
+                       "errors_per_cycle_per_qubit", "energy_density", "energy_density_std", "initial_state"]
+            results_df_averaged = pd.DataFrame(columns=columns_averaged)
+            columns = ["num_sites_x", "num_sites_y", "periodic_bc", "J", "kappa", "g", "B", "T", "Nt", "N_iter",
+                       "errors_per_cycle_per_qubit", "energy_density", "initial_state"]
+            results_df = pd.DataFrame(columns=columns)
+
+            new_row = pd.DataFrame(
+                {'num_sites_x': num_sites_x, 'num_sites_y': num_sites_y, 'periodic_bc': periodic_bc, 'J': J,
+                 'kappa': kappa, 'g': g0, 'B': B0, 'T': T, 'Nt': trotter_steps, 'N_iter': cycles,
+                 'errors_per_cycle_per_qubit': error_rate, 'energy_density': np.mean(energy_above_ground[cycles_averaging_buffer:]) / num_sites_x / num_sites_y,
+                 'energy_density_std': np.std(energy_above_ground[cycles_averaging_buffer:]) / num_sites_x / num_sites_y,'initial_state': initial_state},
+                index=[0])
+            results_df_averaged = pd.concat([results_df_averaged, new_row], ignore_index=True)
+
+            for cycle in range(cycles):
+                new_row = pd.DataFrame(
+                    {'num_sites_x': num_sites_x, 'num_sites_y': num_sites_y, 'periodic_bc': periodic_bc, 'J': J,
+                     'kappa': kappa, 'g': g0, 'B': B0, 'T': T, 'Nt': trotter_steps, 'N_iter': cycle,
+                     'errors_per_cycle_per_qubit': error_rate, 'energy_density': energy_above_ground[cycle] / num_sites_x / num_sites_y, 'initial_state': initial_state},
+                    index=[0])
+                results_df = pd.concat([results_df, new_row], ignore_index=True)
+
+            print(energy_above_ground[-1])
+            # plt.figure()
+            # plt.semilogy(np.arange(len(energy_above_ground))+1, energy_above_ground/num_sites_x/num_sites_y)
+            # plt.xlabel('cycle')
+            # plt.ylabel('energy density')
+            # plt.show()
+
+            # energy_density_spatial, ground_state_energy_density, norms = get_spacial_energy_density(hamiltonian, S, T)
+            # print(energy_density_spatial)
+            # print(ground_state_energy_density)
+            # print(norms)
+            # plt.figure()
+            # plt.imshow(energy_density_spatial)
+            # plt.show()
+
+            with open("KSL_results_averaged.csv", 'a') as f:
+                results_df_averaged.to_csv(f, mode='a', header=f.tell()==0, index=False)
+
+            with open("KSL_results.csv", 'a') as f:
+                results_df.to_csv(f, mode='a', header=f.tell()==0, index=False)

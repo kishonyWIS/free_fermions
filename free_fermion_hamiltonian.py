@@ -7,6 +7,7 @@ from scipy.stats import special_ortho_group
 from scipy.linalg import expm
 from scipy.integrate import solve_ivp
 from scipy import sparse
+from functools import cache
 
 
 def add_to_diag(arr: np.ndarray, to_add: Union[int, list]):
@@ -230,6 +231,8 @@ class FreeFermionHamiltonianTerm(metaclass=ABCMeta):
                 self.gauge_site2[i_gauge_term] = self.gauge_site2[i_gauge_term][:,idx_to_keep]
         if isinstance(self.strength, np.ndarray):
             self.strength = self.strength[idx_to_keep]
+        if isinstance(self.strength, float):
+            self.strength = self.strength
 
 
 class MajoranaFreeFermionHamiltonianTerm(FreeFermionHamiltonianTerm):
@@ -265,6 +268,7 @@ class MajoranaFreeFermionHamiltonianTerm(FreeFermionHamiltonianTerm):
             small_U[i2,i2] = cos
             small_U[i1,i2] = sin * gauge
             small_U[i2,i1] = -sin * gauge
+        small_U = small_U.tocsr()
         return small_U
 
     def get_zeros_tensor(self):
