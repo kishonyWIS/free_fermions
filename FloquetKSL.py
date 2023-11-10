@@ -187,7 +187,7 @@ def draw_lattice(system_shape, state=None, hamiltonian:MajoranaFreeFermionHamilt
             #         fontsize=10, fontname='Times New Roman')
     if color_bonds_by == 'delay' and add_colorbar==True:
         edit_graph(None, None, colorbar_title='Pulse Delay', colormap=colormap,
-                   colorbar_args={'orientation':'horizontal', 'pad':-0.15, 'aspect':30, 'shrink':0.5}, tight=False)
+                   colorbar_args={'orientation':'horizontal', 'aspect':30, 'shrink':0.5}, tight=False)
 
     ax.axis('equal')
     plt.axis('off')

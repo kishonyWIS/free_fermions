@@ -6,7 +6,7 @@ from free_fermion_hamiltonian import MajoranaFreeFermionHamiltonian, MajoranaSin
 from matplotlib import pyplot as plt
 import pandas as pd
 from time_dependence_functions import get_g, get_B
-from space_resolved_energy import get_spacial_energy_density
+from space_resolved_energy import draw_spatial_energy_of_terms
 np.random.seed(0)
 
 
@@ -288,8 +288,8 @@ def cool_KSL(num_sites_x, num_sites_y, J, kappa, smoothed_g, smoothed_B, initial
 
 
 if __name__ == '__main__':
-    num_sites_x = 11
-    num_sites_y = 11
+    num_sites_x = 10
+    num_sites_y = 10
     g0 = 0.5
     B1 = 0.
     B0 = 5.
@@ -297,7 +297,7 @@ if __name__ == '__main__':
     kappa = 0.1
     periodic_bc = False
     cycles_averaging_buffer = 3
-    initial_state = "ground"
+    initial_state = "random"
 
     cycles = 50
 
@@ -313,7 +313,7 @@ if __name__ == '__main__':
 
         flux_corrector = KSL_flux_corrector(num_sites_x, num_sites_y, periodic_bc)
 
-        errors_per_cycle_per_qubit = np.linspace(1e-99, 0.02, 10) #[1e-99], np.linspace(1e-99, 0.02, 10)
+        errors_per_cycle_per_qubit = [1e-99] #[1e-99], np.linspace(1e-99, 0.02, 10)
 
         for error_rate in errors_per_cycle_per_qubit:
 
@@ -332,7 +332,8 @@ if __name__ == '__main__':
                 {'num_sites_x': num_sites_x, 'num_sites_y': num_sites_y, 'periodic_bc': periodic_bc, 'J': J,
                  'kappa': kappa, 'g': g0, 'B': B0, 'T': T, 'Nt': trotter_steps, 'N_iter': cycles,
                  'errors_per_cycle_per_qubit': error_rate, 'energy_density': np.mean(energy_above_ground[cycles_averaging_buffer:]) / num_sites_x / num_sites_y,
-                 'energy_density_std': np.std(energy_above_ground[cycles_averaging_buffer:]) / num_sites_x / num_sites_y,'initial_state': initial_state},
+                 'energy_density_std': np.std(energy_above_ground[cycles_averaging_buffer:]) / num_sites_x / num_sites_y / np.sqrt(cycles-cycles_averaging_buffer),
+                 'initial_state': initial_state},
                 index=[0])
             results_df_averaged = pd.concat([results_df_averaged, new_row], ignore_index=True)
 
@@ -344,20 +345,11 @@ if __name__ == '__main__':
                     index=[0])
                 results_df = pd.concat([results_df, new_row], ignore_index=True)
 
+            fig, ax = plt.subplots()
+            draw_spatial_energy_of_terms(hamiltonian, S, hamiltonian.get_ground_state(T), ['Jx','Jy','Jz'], ax=ax,
+                                         filename = f'KSL_spatial_energy_nx_{num_sites_x}_ny_{num_sites_y}_T_{T}_error_rate_{error_rate}_J_{J}_kappa_{kappa}_g_{g0}_B_{B0}_initial_state_{initial_state}_periodic_bc_{periodic_bc}_cycles_{cycles}_trotter_steps_{trotter_steps}.pdf')
             print(energy_above_ground[-1])
-            # plt.figure()
-            # plt.semilogy(np.arange(len(energy_above_ground))+1, energy_above_ground/num_sites_x/num_sites_y)
-            # plt.xlabel('cycle')
-            # plt.ylabel('energy density')
-            # plt.show()
 
-            # energy_density_spatial, ground_state_energy_density, norms = get_spacial_energy_density(hamiltonian, S, T)
-            # print(energy_density_spatial)
-            # print(ground_state_energy_density)
-            # print(norms)
-            # plt.figure()
-            # plt.imshow(energy_density_spatial)
-            # plt.show()
 
             with open("KSL_results_averaged.csv", 'a') as f:
                 results_df_averaged.to_csv(f, mode='a', header=f.tell()==0, index=False)
