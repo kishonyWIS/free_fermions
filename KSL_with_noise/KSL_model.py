@@ -61,7 +61,7 @@ class KSLHamiltonian(MajoranaFreeFermionHamiltonian):
         return Ud
 
 
-def get_KSL_model(num_sites_x, num_sites_y, J, kappa, g, B, initial_state):
+def get_KSL_model(num_sites_x, num_sites_y, J, kappa, g, B, initial_state, periodic_bc):
     # sublattices are numbered c_0, b^1_0, b^2_0, b^3_0, b^4_0, b^5_0, c_1, b^1_1, b^2_1, b^3_1, b^4_1, b^5_1
     gauge_sublattices = [1, 2, 3, 7, 8, 9]
     non_gauge_sublattices = [0, 4, 5, 6, 10, 11]
@@ -82,8 +82,8 @@ def get_KSL_model(num_sites_x, num_sites_y, J, kappa, g, B, initial_state):
     non_gauge_idxs = np.ix_(range(num_sites_x), range(num_sites_y), non_gauge_sublattices, range(num_sites_x), range(num_sites_y), non_gauge_sublattices)
 
     decoupled_hamiltonian = KSLHamiltonian(system_shape)
-    add_J_term(J, decoupled_hamiltonian)
-    add_kappa_term(kappa, decoupled_hamiltonian)
+    add_J_term(J, decoupled_hamiltonian, periodic_bc=periodic_bc)
+    add_kappa_term(kappa, decoupled_hamiltonian, periodic_bc=periodic_bc)
     decoupled_hamiltonian_matrix = decoupled_hamiltonian.get_matrix()
     ground_state = decoupled_hamiltonian.get_ground_state()
     S0_tensor = np.zeros(system_shape)
@@ -98,7 +98,7 @@ def get_KSL_model(num_sites_x, num_sites_y, J, kappa, g, B, initial_state):
         S0_tensor[non_gauge_idxs] = S_non_gauge.tensor[non_gauge_idxs]
 
     gauge_setting_hamiltonian = KSLHamiltonian(system_shape)
-    add_gauge_fixing_term(gauge_setting_hamiltonian)
+    add_gauge_fixing_term(gauge_setting_hamiltonian, periodic_bc=periodic_bc)
 
     S_gauge = gauge_setting_hamiltonian.get_ground_state()
     S0_tensor[gauge_idxs] = S_gauge.tensor[gauge_idxs]
@@ -106,14 +106,14 @@ def get_KSL_model(num_sites_x, num_sites_y, J, kappa, g, B, initial_state):
     S.reset_all_tau()
 
     hamiltonian = KSLHamiltonian(system_shape)
-    add_J_term(J, hamiltonian, gauge_field=S)#####gauge!!!
-    add_kappa_term(kappa, hamiltonian, gauge_field=S)#####gauge!!!
-    add_g_term(g, hamiltonian)
-    add_B_term(B, hamiltonian)
+    add_J_term(J, hamiltonian, gauge_field=S, periodic_bc=periodic_bc)#####gauge!!!
+    add_kappa_term(kappa, hamiltonian, gauge_field=S, periodic_bc=periodic_bc)#####gauge!!!
+    add_g_term(g, hamiltonian, periodic_bc=periodic_bc)
+    add_B_term(B, hamiltonian, periodic_bc=periodic_bc)
 
     decoupled_hamiltonian_with_gauge = KSLHamiltonian(system_shape)
-    add_J_term(J, decoupled_hamiltonian_with_gauge, gauge_field=S) #gauge!!!
-    add_kappa_term(kappa, decoupled_hamiltonian_with_gauge, gauge_field=S) #gauge!!!
+    add_J_term(J, decoupled_hamiltonian_with_gauge, gauge_field=S, periodic_bc=periodic_bc) #gauge!!!
+    add_kappa_term(kappa, decoupled_hamiltonian_with_gauge, gauge_field=S, periodic_bc=periodic_bc) #gauge!!!
 
     spin_to_fermion_sublattices = {}
     for sublattice_name, sublattice_shift in zip(['A', 'B'], [0, 6]):
@@ -138,16 +138,15 @@ def get_KSL_model(num_sites_x, num_sites_y, J, kappa, g, B, initial_state):
 
     return hamiltonian, S, decoupled_hamiltonian_with_gauge, E_gs, all_errors_unitaries, errors_effect_gauge
 
+def add_B_term(B, hamiltonian, periodic_bc=False):
+    hamiltonian.add_term(name='B_0', strength=-1, sublattice1=4, sublattice2=5, site_offset=(0, 0), time_dependence=B, periodic_bc=periodic_bc)
+    hamiltonian.add_term(name='B_1', strength=-1, sublattice1=10, sublattice2=11, site_offset=(0, 0), time_dependence=B, periodic_bc=periodic_bc)
 
-def add_B_term(B, hamiltonian):
-    hamiltonian.add_term(name='B_0', strength=-1, sublattice1=4, sublattice2=5, site_offset=(0, 0), time_dependence=B)
-    hamiltonian.add_term(name='B_1', strength=-1, sublattice1=10, sublattice2=11, site_offset=(0, 0), time_dependence=B)
+def add_g_term(g, hamiltonian, periodic_bc=False):
+    hamiltonian.add_term(name='g_0', strength=-1, sublattice1=4, sublattice2=0, site_offset=(0, 0), time_dependence=g, periodic_bc=periodic_bc)
+    hamiltonian.add_term(name='g_1', strength=-1, sublattice1=10, sublattice2=6, site_offset=(0, 0), time_dependence=g, periodic_bc=periodic_bc)
 
-def add_g_term(g, hamiltonian):
-    hamiltonian.add_term(name='g_0', strength=-1, sublattice1=4, sublattice2=0, site_offset=(0, 0), time_dependence=g)
-    hamiltonian.add_term(name='g_1', strength=-1, sublattice1=10, sublattice2=6, site_offset=(0, 0), time_dependence=g)
-
-def add_kappa_term(kappa, hamiltonian, gauge_field=None):
+def add_kappa_term(kappa, hamiltonian, gauge_field=None, periodic_bc=False):
     kappa_df = pd.DataFrame(columns=['name', 'x_y_z', 'sublattice_name', 'shift', 'sign', 'sublattice1', 'sublattice2', 'offset', 'gauge_sublattice1', 'gauge_sublattice2', 'gauge_offset1', 'gauge_offset2'])
     kappa_df['x_y_z'] = ['x', 'y', 'z', 'x', 'y', 'z', 'x', 'y', 'z', 'x', 'y', 'z']
     kappa_df['sublattice_name'] = ['A', 'A', 'A', 'B', 'B', 'B', 'A', 'A', 'A', 'B', 'B', 'B']
@@ -164,29 +163,29 @@ def add_kappa_term(kappa, hamiltonian, gauge_field=None):
 
     for row in kappa_df.itertuples():
         hamiltonian.add_term(name=row.name, strength=kappa*row.sign, sublattice1=row.sublattice1, sublattice2=row.sublattice2, site_offset=row.offset,
-                             gauge_field=gauge_field, gauge_sublattice1=row.gauge_sublattice1, gauge_sublattice2=row.gauge_sublattice2, gauge_site_offset1=row.gauge_offset1, gauge_site_offset2=row.gauge_offset2)
+                             gauge_field=gauge_field, gauge_sublattice1=row.gauge_sublattice1, gauge_sublattice2=row.gauge_sublattice2, gauge_site_offset1=row.gauge_offset1, gauge_site_offset2=row.gauge_offset2, periodic_bc=periodic_bc)
         dim_modulation = np.argmax(np.array(row.offset)!=0)
         filter_site1 = lambda s1: (s1[dim_modulation]*row.offset[dim_modulation]) % 2 == row.shift
         hamiltonian.terms[row.name].filter_site1(filter_site1)
 
-def add_J_term(J, hamiltonian, gauge_field=None):
+def add_J_term(J, hamiltonian, gauge_field=None, periodic_bc=False):
     site_offset_x = (0, 0)
     site_offset_y = (1, 0)
     site_offset_z = (0, 1)
     hamiltonian.add_term(name='Jx', strength=-J, sublattice1=0, sublattice2=6, site_offset=site_offset_x,
-                         gauge_field=gauge_field, gauge_sublattice1=1, gauge_sublattice2=7, gauge_site_offset1=(0,0), gauge_site_offset2=site_offset_x)
+                         gauge_field=gauge_field, gauge_sublattice1=1, gauge_sublattice2=7, gauge_site_offset1=(0,0), gauge_site_offset2=site_offset_x, periodic_bc=periodic_bc)
     hamiltonian.add_term(name='Jy', strength=J, sublattice1=6, sublattice2=0, site_offset=site_offset_y,
-                         gauge_field=gauge_field, gauge_sublattice1=2, gauge_sublattice2=8, gauge_site_offset1=site_offset_y, gauge_site_offset2=(0,0))
+                         gauge_field=gauge_field, gauge_sublattice1=2, gauge_sublattice2=8, gauge_site_offset1=site_offset_y, gauge_site_offset2=(0,0), periodic_bc=periodic_bc)
     hamiltonian.add_term(name='Jz', strength=J, sublattice1=6, sublattice2=0, site_offset=site_offset_z,
-                         gauge_field=gauge_field, gauge_sublattice1=3, gauge_sublattice2=9, gauge_site_offset1=site_offset_z, gauge_site_offset2=(0,0))
+                         gauge_field=gauge_field, gauge_sublattice1=3, gauge_sublattice2=9, gauge_site_offset1=site_offset_z, gauge_site_offset2=(0,0), periodic_bc=periodic_bc)
 
-def add_gauge_fixing_term(hamiltonian):
+def add_gauge_fixing_term(hamiltonian, periodic_bc=False):
     site_offset_x = (0, 0)
     site_offset_y = (1, 0)
     site_offset_z = (0, 1)
-    hamiltonian.add_term(name='Gx', strength=-1, sublattice1=1, sublattice2=7, site_offset=site_offset_x)
-    hamiltonian.add_term(name='Gy', strength=1, sublattice1=8, sublattice2=2, site_offset=site_offset_y)
-    hamiltonian.add_term(name='Gz', strength=1, sublattice1=9, sublattice2=3, site_offset=site_offset_z)
+    hamiltonian.add_term(name='Gx', strength=-1, sublattice1=1, sublattice2=7, site_offset=site_offset_x, periodic_bc=periodic_bc)
+    hamiltonian.add_term(name='Gy', strength=1, sublattice1=8, sublattice2=2, site_offset=site_offset_y, periodic_bc=periodic_bc)
+    hamiltonian.add_term(name='Gz', strength=1, sublattice1=9, sublattice2=3, site_offset=site_offset_z, periodic_bc=periodic_bc)
 
 
 class KSLState(MajoranaSingleParticleDensityMatrix):
@@ -213,12 +212,25 @@ class KSLState(MajoranaSingleParticleDensityMatrix):
             fluxes = fluxes[:-1, :-1]
         return fluxes
 
+    def fluxes_around_torus(self):
+        flux_x = 1
+        flux_y = 1
+        for i_x in range(self.system_shape[0]):
+            flux_x *= self.tensor[(i_x, 0, 1, i_x, 0, 7)]
+            flux_x *= self.tensor[((i_x+1)%self.system_shape[0], 0, 2, i_x, 0, 8)]
+        for i_y in range(self.system_shape[1]):
+            flux_y *= self.tensor[(0, i_y, 1, 0, i_y, 7)]
+            flux_y *= self.tensor[(0, (i_y+1)%self.system_shape[1], 3, 0, i_y, 9)]
+        return flux_x, flux_y
+
 
 def cool_KSL(num_sites_x, num_sites_y, J, kappa, smoothed_g, smoothed_B, initial_state, periodic_bc, cycles, errors_per_cycle, trotter_steps, T, flux_corrector):
     hamiltonian, S, decoupled_hamiltonian_with_gauge, E_gs, all_errors_unitaries, errors_effect_gauge = \
-        get_KSL_model(num_sites_x, num_sites_y, J, kappa, smoothed_g, smoothed_B, initial_state=initial_state)
+        get_KSL_model(num_sites_x, num_sites_y, J, kappa, smoothed_g, smoothed_B, initial_state=initial_state, periodic_bc=periodic_bc)
     Ud = hamiltonian.full_cycle_unitary_trotterize(0, T, steps=trotter_steps)
     Es = []
+    fluxes_x = []
+    fluxes_y = []
     cycle = 0
     time_to_error = np.random.exponential(T / errors_per_cycle)
     time_in_current_cycle = 0.
@@ -271,6 +283,10 @@ def cool_KSL(num_sites_x, num_sites_y, J, kappa, smoothed_g, smoothed_B, initial
                 hamiltonian.set_new_gauge()
                 Ud = hamiltonian.full_cycle_unitary_trotterize(0, T, steps=trotter_steps)
 
+            flux_x, flux_y = S.fluxes_around_torus()
+            fluxes_x.append(flux_x)
+            fluxes_y.append(flux_y)
+
             time_in_current_cycle = 0
 
         elif time_in_current_cycle > 0:
@@ -284,7 +300,11 @@ def cool_KSL(num_sites_x, num_sites_y, J, kappa, smoothed_g, smoothed_B, initial
         else:
             raise 'invalid cycle state'
 
-    return np.array(Es)-E_gs, S, hamiltonian
+    return np.array(Es)-E_gs, S, hamiltonian, fluxes_x, fluxes_y
+
+
+
+
 
 
 if __name__ == '__main__':
@@ -295,9 +315,9 @@ if __name__ == '__main__':
     B0 = 5.
     J = 1.
     kappa = 0.1
-    periodic_bc = False
+    periodic_bc = True
     cycles_averaging_buffer = 3
-    initial_state = "random"
+    initial_state = "ground"
 
     cycles = 50
 
@@ -313,19 +333,19 @@ if __name__ == '__main__':
 
         flux_corrector = KSL_flux_corrector(num_sites_x, num_sites_y, periodic_bc)
 
-        errors_per_cycle_per_qubit = [1e-99] #[1e-99], np.linspace(1e-99, 0.02, 10)
+        errors_per_cycle_per_qubit = np.linspace(1e-99, 0.02, 10) #[1e-99], np.linspace(1e-99, 0.02, 10)
 
         for error_rate in errors_per_cycle_per_qubit:
 
             errors_per_cycle = error_rate * num_sites_x * num_sites_y * 4
 
-            energy_above_ground, S, hamiltonian = cool_KSL(num_sites_x, num_sites_y, J, kappa, smoothed_g, smoothed_B, initial_state=initial_state, periodic_bc=periodic_bc, cycles=cycles, errors_per_cycle=errors_per_cycle, trotter_steps=trotter_steps, T=T, flux_corrector=flux_corrector)
+            energy_above_ground, S, hamiltonian, flux_x, flux_y = cool_KSL(num_sites_x, num_sites_y, J, kappa, smoothed_g, smoothed_B, initial_state=initial_state, periodic_bc=periodic_bc, cycles=cycles, errors_per_cycle=errors_per_cycle, trotter_steps=trotter_steps, T=T, flux_corrector=flux_corrector)
 
             columns_averaged = ["num_sites_x", "num_sites_y", "periodic_bc", "J", "kappa", "g", "B", "T", "Nt", "N_iter",
                        "errors_per_cycle_per_qubit", "energy_density", "energy_density_std", "initial_state"]
             results_df_averaged = pd.DataFrame(columns=columns_averaged)
             columns = ["num_sites_x", "num_sites_y", "periodic_bc", "J", "kappa", "g", "B", "T", "Nt", "N_iter",
-                       "errors_per_cycle_per_qubit", "energy_density", "initial_state"]
+                       "errors_per_cycle_per_qubit", "energy_density", "initial_state", "flux_x", "flux_y"]
             results_df = pd.DataFrame(columns=columns)
 
             new_row = pd.DataFrame(
@@ -341,13 +361,24 @@ if __name__ == '__main__':
                 new_row = pd.DataFrame(
                     {'num_sites_x': num_sites_x, 'num_sites_y': num_sites_y, 'periodic_bc': periodic_bc, 'J': J,
                      'kappa': kappa, 'g': g0, 'B': B0, 'T': T, 'Nt': trotter_steps, 'N_iter': cycle,
-                     'errors_per_cycle_per_qubit': error_rate, 'energy_density': energy_above_ground[cycle] / num_sites_x / num_sites_y, 'initial_state': initial_state},
+                     'errors_per_cycle_per_qubit': error_rate, 'energy_density': energy_above_ground[cycle] / num_sites_x / num_sites_y, 'initial_state': initial_state,
+                     'flux_x': flux_x[cycle], 'flux_y': flux_y[cycle]},
                     index=[0])
                 results_df = pd.concat([results_df, new_row], ignore_index=True)
+
+
 
             fig, ax = plt.subplots()
             draw_spatial_energy_of_terms(hamiltonian, S, hamiltonian.get_ground_state(T), ['Jx','Jy','Jz'], ax=ax,
                                          filename = f'KSL_spatial_energy_nx_{num_sites_x}_ny_{num_sites_y}_T_{T}_error_rate_{error_rate}_J_{J}_kappa_{kappa}_g_{g0}_B_{B0}_initial_state_{initial_state}_periodic_bc_{periodic_bc}_cycles_{cycles}_trotter_steps_{trotter_steps}.pdf')
+
+            plt.figure()
+            plt.plot(energy_above_ground)
+
+            plt.figure()
+            plt.plot(flux_x)
+            plt.plot(flux_y)
+
             print(energy_above_ground[-1])
 
 

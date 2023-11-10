@@ -7,8 +7,6 @@ from scipy.stats import special_ortho_group
 from scipy.linalg import expm
 from scipy.integrate import solve_ivp
 from scipy import sparse
-from functools import cache
-
 
 def add_to_diag(arr: np.ndarray, to_add: Union[int, list]):
     idx = np.diag_indices_from(arr)
