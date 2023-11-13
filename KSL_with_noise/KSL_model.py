@@ -8,6 +8,7 @@ import pandas as pd
 from time_dependence_functions import get_g, get_B
 from space_resolved_energy import draw_spatial_energy_of_terms
 np.random.seed(0)
+from collections.abc import Iterable
 
 
 class KSLHamiltonian(MajoranaFreeFermionHamiltonian):
@@ -210,6 +211,8 @@ class KSLState(MajoranaSingleParticleDensityMatrix):
         fluxes *= self.tensor[(*sites_shifted_x_y, 3, *sites_shifted_x, 9)]
         if not periodic_bc:
             fluxes = fluxes[:-1, :-1]
+        if isinstance(periodic_bc, Iterable):
+            fluxes = fluxes[:None if periodic_bc[0] else -1, :None if periodic_bc[1] else -1]
         return fluxes
 
     def fluxes_around_torus(self):
@@ -308,14 +311,14 @@ def cool_KSL(num_sites_x, num_sites_y, J, kappa, smoothed_g, smoothed_B, initial
 
 
 if __name__ == '__main__':
-    num_sites_x = 10
-    num_sites_y = 10
+    num_sites_x = 4
+    num_sites_y = 4
     g0 = 0.5
     B1 = 0.
     B0 = 5.
     J = 1.
     kappa = 0.1
-    periodic_bc = True
+    periodic_bc = (True, True)
     cycles_averaging_buffer = 3
     initial_state = "ground"
 
@@ -333,7 +336,7 @@ if __name__ == '__main__':
 
         flux_corrector = KSL_flux_corrector(num_sites_x, num_sites_y, periodic_bc)
 
-        errors_per_cycle_per_qubit = np.linspace(1e-99, 0.02, 10) #[1e-99], np.linspace(1e-99, 0.02, 10)
+        errors_per_cycle_per_qubit = [1e-99] #[1e-99], np.linspace(1e-99, 0.02, 10)
 
         for error_rate in errors_per_cycle_per_qubit:
 
@@ -348,28 +351,27 @@ if __name__ == '__main__':
                        "errors_per_cycle_per_qubit", "energy_density", "initial_state", "flux_x", "flux_y"]
             results_df = pd.DataFrame(columns=columns)
 
-            new_row = pd.DataFrame(
+            new_row = pd.Series(
                 {'num_sites_x': num_sites_x, 'num_sites_y': num_sites_y, 'periodic_bc': periodic_bc, 'J': J,
                  'kappa': kappa, 'g': g0, 'B': B0, 'T': T, 'Nt': trotter_steps, 'N_iter': cycles,
                  'errors_per_cycle_per_qubit': error_rate, 'energy_density': np.mean(energy_above_ground[cycles_averaging_buffer:]) / num_sites_x / num_sites_y,
                  'energy_density_std': np.std(energy_above_ground[cycles_averaging_buffer:]) / num_sites_x / num_sites_y / np.sqrt(cycles-cycles_averaging_buffer),
-                 'initial_state': initial_state},
-                index=[0])
+                 'initial_state': initial_state}).to_frame().transpose()
             results_df_averaged = pd.concat([results_df_averaged, new_row], ignore_index=True)
 
             for cycle in range(cycles):
-                new_row = pd.DataFrame(
+                new_row = pd.Series(
                     {'num_sites_x': num_sites_x, 'num_sites_y': num_sites_y, 'periodic_bc': periodic_bc, 'J': J,
                      'kappa': kappa, 'g': g0, 'B': B0, 'T': T, 'Nt': trotter_steps, 'N_iter': cycle,
                      'errors_per_cycle_per_qubit': error_rate, 'energy_density': energy_above_ground[cycle] / num_sites_x / num_sites_y, 'initial_state': initial_state,
-                     'flux_x': flux_x[cycle], 'flux_y': flux_y[cycle]},
-                    index=[0])
+                     'flux_x': flux_x[cycle], 'flux_y': flux_y[cycle]}).to_frame().transpose()
                 results_df = pd.concat([results_df, new_row], ignore_index=True)
 
 
 
             fig, ax = plt.subplots()
-            draw_spatial_energy_of_terms(hamiltonian, S, hamiltonian.get_ground_state(T), ['Jx','Jy','Jz'], ax=ax,
+            draw_spatial_energy_of_terms(hamiltonian, S, hamiltonian.get_ground_state(T),
+                                         [name for name in hamiltonian.terms.keys() if 'J' in name or 'kappa' in name], ax=ax,
                                          filename = f'KSL_spatial_energy_nx_{num_sites_x}_ny_{num_sites_y}_T_{T}_error_rate_{error_rate}_J_{J}_kappa_{kappa}_g_{g0}_B_{B0}_initial_state_{initial_state}_periodic_bc_{periodic_bc}_cycles_{cycles}_trotter_steps_{trotter_steps}.pdf')
 
             plt.figure()

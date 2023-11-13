@@ -23,7 +23,8 @@ def draw_spatial_energy_of_terms(hamiltonian, S, S_gs, term_names:list[str], ax=
                 if np.prod(term.site1.shape) == 0:
                     continue
                 term_matrix = term.time_independent_matrix
-                energy.append(S.get_energy(term_matrix) - S_gs.get_energy(term_matrix))
+                energy.append(S_gs.get_energy(term_matrix))
+                # energy.append(S.get_energy(term_matrix) - S_gs.get_energy(term_matrix))
                 site1_x_y.append(hexagonal_lattice_site_to_x_y((term.site1[0], term.site1[1], int(term.sublattice1/6))))
                 site2_x_y.append(hexagonal_lattice_site_to_x_y((term.site2[0], term.site2[1], int(term.sublattice2/6))))
     energy = np.array(energy)
@@ -31,11 +32,9 @@ def draw_spatial_energy_of_terms(hamiltonian, S, S_gs, term_names:list[str], ax=
     site2_x_y = np.array(site2_x_y).squeeze()
 
     segments = np.stack([site1_x_y, site2_x_y], axis=1)
-    lc = LineCollection(segments, cmap='viridis', norm=plt.Normalize(0., energy.max()))
+    lc = LineCollection(segments, cmap='viridis')#, norm=plt.Normalize(0., energy.max()))
     lc.set_array(energy)
     ax.add_collection(lc)
-    # cbar = plt.colorbar(lc, label='Energy', orientation='horizontal', pad= -0.15, aspect= 30, shrink= 0.5)
-    # make axis tight
     x_min = min(site1_x_y[:, 0].min(), site2_x_y[:, 0].min())
     x_max = max(site1_x_y[:, 0].max(), site2_x_y[:, 0].max())
     y_min = min(site1_x_y[:, 1].min(), site2_x_y[:, 1].min())

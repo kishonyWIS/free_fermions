@@ -206,11 +206,15 @@ class FreeFermionHamiltonianTerm(metaclass=ABCMeta):
         return self.apply_time_dependence(self.time_independent_matrix, t)
 
     def offset_to_site1_site2(self, offset):
-        if self.periodic_bc:
+        if self.periodic_bc is True:
             sites1 = np.meshgrid(*(np.arange(self.system_shape[dim]) for dim in range(self.dims)),
                                  indexing='ij')
-        else:
+        elif self.periodic_bc is False:
             sites1 = np.meshgrid(*(np.arange(self.system_shape[dim] - np.abs(offset[dim])) for dim in range(self.dims)),
+                                 indexing='ij')
+        else:
+            sites1 = np.meshgrid(*(np.arange(self.system_shape[dim] -
+                                             (np.abs(offset[dim]) if not self.periodic_bc[dim] else 0)) for dim in range(self.dims)),
                                  indexing='ij')
         sites1 = self.shift_sites_by_offset(sites1, np.abs(offset)*(offset<0))
         sites2 = self.shift_sites_by_offset(sites1, offset)
