@@ -174,15 +174,21 @@ class FreeFermionHamiltonianTerm(metaclass=ABCMeta):
     def get_transposed_value(self, value: Union[float, list, complex]) -> Union[float, list, complex]:
         pass
 
+    def get_gauge_value(self):
+        gauge = 1
+        if self.gauge_field is not None:
+            for i_gauge_term in range(self.num_gauge_terms):
+                gauge *= self.gauge_field.tensor[(*self.gauge_site1[i_gauge_term], self.gauge_sublattice1[i_gauge_term],
+                                                  *self.gauge_site2[i_gauge_term],
+                                                  self.gauge_sublattice2[i_gauge_term])]
+        return gauge
+
     @property
     def time_independent_tensor(self) -> np.ndarray:
         if self.gauge_field is not None:
             # Setting strength to be a gauge field
             self._time_independent_tensor = self.get_zeros_tensor()
-            values_to_add = 2 * self._strength
-            for i_gauge_term in range(self.num_gauge_terms):
-                values_to_add *= self.gauge_field.tensor[(*self.gauge_site1[i_gauge_term], self.gauge_sublattice1[i_gauge_term],
-                                                            *self.gauge_site2[i_gauge_term], self.gauge_sublattice2[i_gauge_term])]
+            values_to_add = 2 * self._strength * self.get_gauge_value()
             self._time_independent_tensor[(*self.site1, self.sublattice1, *self.site2, self.sublattice2)] += values_to_add
             self._time_independent_tensor[(*self.site2, self.sublattice2, *self.site1, self.sublattice1)] += self.get_transposed_value(values_to_add)
         return self._time_independent_tensor
@@ -261,11 +267,7 @@ class MajoranaFreeFermionHamiltonianTerm(FreeFermionHamiltonianTerm):
             small_U = sparse.eye(matrix_shape, format='lil')
             i1 = site_and_sublattice_to_flat_index(self.site1, self.sublattice1, self.system_shape)
             i2 = site_and_sublattice_to_flat_index(self.site2, self.sublattice2, self.system_shape)
-            gauge = 1
-            if self.gauge_field is not None:
-                for i_gauge_term in range(self.num_gauge_terms):
-                    gauge *= self.gauge_field.tensor[(*self.gauge_site1[i_gauge_term], self.gauge_sublattice1[i_gauge_term],
-                                                        *self.gauge_site2[i_gauge_term], self.gauge_sublattice2[i_gauge_term])]
+            gauge = self.get_gauge_value()
             small_U[i1,i1] = cos
             small_U[i2,i2] = cos
             small_U[i1,i2] = sin * gauge

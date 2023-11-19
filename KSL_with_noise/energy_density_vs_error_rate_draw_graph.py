@@ -21,15 +21,17 @@ with sns.axes_style("whitegrid"):
     plt.rcParams.update(rc)
     plt.rcParams["font.family"] = "Times New Roman"
     plt.figure()
+    periodic_bc_labels = {'True': 'Periodic', 'False': 'Open', '(True, False)': 'Mixed'}
 
-    for periodic_bc in [True, False]:
+    for periodic_bc in ['True', 'False', '(True, False)']:
         results_df = pd.read_csv("KSL_results_averaged.csv")
         results_df = results_df.query(
-            f"num_sites_x == {num_sites_x} & num_sites_y == {num_sites_y} & Nt == {trotter_steps} & N_iter == {cycles} & periodic_bc == {periodic_bc}")
+            f"num_sites_x == {num_sites_x} & num_sites_y == {num_sites_y} & Nt == {trotter_steps} & N_iter == {cycles}")
+        results_df = results_df[results_df.periodic_bc == periodic_bc]
         marker = next(markers)
         color = next(colors)
         # plt.plot(results_df.errors_per_cycle_per_qubit, results_df.energy_density, linestyle='None', marker=marker, color=color)
-        plt.errorbar(results_df.errors_per_cycle_per_qubit, results_df.energy_density, yerr=results_df.energy_density_std, linestyle='None', marker=marker, color=color, label='periodic' if periodic_bc else 'open')
+        plt.errorbar(results_df.errors_per_cycle_per_qubit, results_df.energy_density, yerr=results_df.energy_density_std, linestyle='None', marker=marker, color=color, label=periodic_bc_labels[periodic_bc])
 
         b, a = np.polyfit(results_df.errors_per_cycle_per_qubit, results_df.energy_density, deg=1)
         xseq = np.linspace(0, max(results_df.errors_per_cycle_per_qubit), num=2)
@@ -43,3 +45,4 @@ with sns.axes_style("whitegrid"):
     plt.tight_layout()
     plt.savefig(f'graphs/KSL_energy_vs_error_rate_steps_{trotter_steps}_cycles_{cycles}_sites_x_{num_sites_x}_sites_y_{num_sites_y}.pdf')
     plt.show()
+    print()

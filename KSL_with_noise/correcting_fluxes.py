@@ -7,8 +7,10 @@ class KSL_flux_corrector:
     def __init__(self, n_sites_x, n_sites_y, periodic_bc=False):
         self.n_sites_x = n_sites_x
         self.n_sites_y = n_sites_y
-        self.n_plaquettes_x = n_sites_x if (periodic_bc == True or periodic_bc[0]) else n_sites_x - 1
-        self.n_plaquettes_y = n_sites_y if (periodic_bc == True or periodic_bc[1]) else n_sites_y - 1
+        x_periodic_bc = periodic_bc if isinstance(periodic_bc, bool) else periodic_bc[0]
+        y_periodic_bc = periodic_bc if isinstance(periodic_bc, bool) else periodic_bc[1]
+        self.n_plaquettes_x = n_sites_x if x_periodic_bc else n_sites_x - 1
+        self.n_plaquettes_y = n_sites_y if y_periodic_bc else n_sites_y - 1
         H = np.zeros((self.n_plaquettes_x*self.n_plaquettes_y, 2*n_sites_x*n_sites_y*3))
         first_plaq_x_shift = np.array([0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1])
         first_plaq_y_shift = np.array([0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1])
