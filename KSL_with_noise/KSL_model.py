@@ -1,6 +1,7 @@
+from __future__ import annotations
 import numpy as np
-
 from KSL_with_noise.correcting_fluxes import KSL_flux_corrector
+from KSL_with_noise.energy_distribution import EnergyDistribution
 from free_fermion_hamiltonian import MajoranaFreeFermionHamiltonian, MajoranaSingleParticleDensityMatrix, \
     get_fermion_bilinear_unitary
 from matplotlib import pyplot as plt
@@ -231,9 +232,10 @@ def cool_KSL(num_sites_x, num_sites_y, J, kappa, smoothed_g, smoothed_B, initial
     time_in_current_cycle = 0.
     Es.append(S.get_energy(decoupled_hamiltonian_with_gauge.get_matrix()))
     if draw_spatial_energy is not False:
-        spatial_energy = SpatialEnergy(hamiltonian, hamiltonian_fixed_gauge, S_gs,
-                                       [name for name in hamiltonian.terms.keys() if
+        spatial_energy = EnergyDistribution([name for name in hamiltonian.terms.keys() if
                                         'J' in name or 'kappa' in name][::-1])
+        spatial_energy.set_ground_state_and_geometry(hamiltonian_fixed_gauge, S_gs)
+
     while True:
         if cycle == cycles:
             # finished all cycles
@@ -287,8 +289,7 @@ def cool_KSL(num_sites_x, num_sites_y, J, kappa, smoothed_g, smoothed_B, initial
             fluxes_y.append(flux_y)
 
             if (draw_spatial_energy == 'average' and cycle > cycles_averaging_buffer) or (draw_spatial_energy == 'last' and cycle == cycles):
-                spatial_energy.update_matrix(hamiltonian)
-                spatial_energy.update_energies(S)
+                spatial_energy.update_energy(hamiltonian, S)
 
             time_in_current_cycle = 0
 
@@ -311,23 +312,23 @@ def cool_KSL(num_sites_x, num_sites_y, J, kappa, smoothed_g, smoothed_B, initial
 
 
 if __name__ == '__main__':
-    num_sites_x = 4
-    num_sites_y = 4
+    num_sites_x = 10
+    num_sites_y = 10
     g0 = 0.5
     B1 = 0.
     B0 = 5.
     J = 1.
-    kappa = 0.1
+    kappa = 1.
     periodic_bc = (True, False)
     cycles_averaging_buffer = 3
     initial_state = "ground"
-    draw_spatial_energy = 'average'
+    draw_spatial_energy = 'last'
 
     cycles = 50
 
-    trotter_steps = 100
+    trotter_steps = 10000
 
-    T_list = [20.]
+    T_list = [2.5]
 
     for T in T_list:
 

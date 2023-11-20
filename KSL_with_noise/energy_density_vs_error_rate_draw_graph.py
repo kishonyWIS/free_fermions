@@ -23,7 +23,7 @@ with sns.axes_style("whitegrid"):
     plt.figure()
     periodic_bc_labels = {'True': 'Periodic', 'False': 'Open', '(True, False)': 'Mixed'}
 
-    for periodic_bc in ['True', 'False', '(True, False)']:
+    for periodic_bc in ['True', 'False']:
         results_df = pd.read_csv("KSL_results_averaged.csv")
         results_df = results_df.query(
             f"num_sites_x == {num_sites_x} & num_sites_y == {num_sites_y} & Nt == {trotter_steps} & N_iter == {cycles}")
