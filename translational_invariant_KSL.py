@@ -64,7 +64,7 @@ def get_KSL_model(f, Delta, g, B, initial_state='random', num_cooling_sublattice
 
 
 def get_f(kx, ky, Jx, Jy, Jz):
-    return -Jx-Jy*np.exp(-1j*kx)-Jz*np.exp(-1j*ky)
+    return 2*(-Jx-Jy*np.exp(-1j*kx)-Jz*np.exp(-1j*ky))
 
 
 def get_Delta(kx, ky, kappa):

@@ -6,10 +6,10 @@ import matplotlib as mpl
 import pandas as pd
 import numpy as np
 
-trotter_steps = 100
+trotter_steps = 200
 cycles = 50
-num_sites_x = 10
-num_sites_y = 10
+num_sites_x = [10]
+num_sites_y = [10]
 
 markers = itertools.cycle(['o', 's', '^', '*', '8', 'p', 'd', 'v'])
 prop_cycle = plt.rcParams['axes.prop_cycle']
@@ -23,10 +23,10 @@ with sns.axes_style("whitegrid"):
     plt.figure()
     periodic_bc_labels = {'True': 'Periodic', 'False': 'Open', '(True, False)': 'Mixed'}
 
-    for periodic_bc in ['True', 'False']:
+    for periodic_bc in ['True', '(True, False)']:
         results_df = pd.read_csv("KSL_results_averaged.csv")
         results_df = results_df.query(
-            f"num_sites_x == {num_sites_x} & num_sites_y == {num_sites_y} & Nt == {trotter_steps} & N_iter == {cycles}")
+            f"num_sites_x in {num_sites_x} & num_sites_y in {num_sites_y} & Nt == {trotter_steps} & N_iter == {cycles}")
         results_df = results_df[results_df.periodic_bc == periodic_bc]
         marker = next(markers)
         color = next(colors)

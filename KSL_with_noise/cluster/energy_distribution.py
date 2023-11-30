@@ -1,4 +1,3 @@
-from __future__ import annotations
 from copy import deepcopy
 import numpy as np
 import matplotlib.pyplot as plt
@@ -48,15 +47,15 @@ class TermEnergyDistribution:
         self.num_samples += 1
 
 class EnergyDistribution:
-    def __init__(self, term_names: list[str]):
+    def __init__(self, term_names: list):
         self.term_energy_dists = {term_name: TermEnergyDistribution() for term_name in term_names}
 
-    def set_ground_state_and_geometry(self, gs_hamiltonian: KSLHamiltonian, S_gs: KSLState):
+    def set_ground_state_and_geometry(self, gs_hamiltonian, S_gs):
         gs_hamiltonian_copy = deepcopy(gs_hamiltonian)
         for term_name, term_energy_dist in self.term_energy_dists.items():
             term_energy_dist.set_ground_state_and_geometry(gs_hamiltonian_copy.terms[term_name], S_gs)
 
-    def update_energy(self, hamiltonian: KSLHamiltonian, S: KSLState):
+    def update_energy(self, hamiltonian, S):
         hamiltonian_copy = deepcopy(hamiltonian)
         for term_name, term_energy_dist in self.term_energy_dists.items():
             term_energy_dist.update_energy(hamiltonian_copy.terms[term_name], S)
@@ -94,7 +93,7 @@ class EnergyDistribution:
         site1_outside_system = np.array(site1_outside_system)
         site2_outside_system = np.array(site2_outside_system)
         segments = np.stack([site1_x_y, site2_x_y], axis=1)
-        lc = LineCollection(segments, norm=mpl.colors.CenteredNorm(), cmap='coolwarm', linewidths=3)  # , norm=plt.Normalize(0., energy.max()))
+        lc = LineCollection(segments, cmap='coolwarm', linewidths=3)  # , norm=plt.Normalize(0., energy.max()))
         lc.set_array(energy)
         ax.add_collection(lc)
         # draw the sites at circles black if inside the system, grey if outside

@@ -1,12 +1,8 @@
 import numpy as np
-from memory_profiler import profile
-from numba import jit
-
 from correcting_fluxes import KSL_flux_corrector
 from energy_distribution import EnergyDistribution
 from free_fermion_hamiltonian import MajoranaFreeFermionHamiltonian, MajoranaSingleParticleDensityMatrix, \
     get_fermion_bilinear_unitary
-from matplotlib import pyplot as plt
 import pandas as pd
 from time_dependence_functions import get_g, get_B
 np.random.seed(0)
@@ -38,7 +34,6 @@ class KSLHamiltonian(MajoranaFreeFermionHamiltonian):
     #         Ud = self.small_unitary(term_name, t + self.dt / 2) @ Ud
     #     return Ud
 
-    @jit()
     def _unitary_trotterize_run_step(self, Ud, t):
         Jx = self.small_unitary('Jx', t + self.dt / 2)
         Jy = self.small_unitary('Jy', t + self.dt / 2)
@@ -336,7 +331,7 @@ if __name__ == '__main__':
     trotter_steps = 200
 
     T_list = [5.]
-    errors_per_cycle_per_qubit = np.linspace(1e-99, 0.02, 10)  # [1e-99], np.linspace(1e-99, 0.02, 10)
+    errors_per_cycle_per_qubit = np.linspace(0., 0.02, 10)  # [0.], np.linspace(1e-99, 0.02, 10)
 
     for T in T_list:
 

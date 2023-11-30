@@ -1,8 +1,6 @@
 from abc import ABCMeta, abstractmethod
-from typing import Union, Callable, Optional
+from typing import Union, Callable, Optional, Tuple
 import numpy as np
-from memory_profiler import profile
-from numba import jit
 from scipy.integrate import ode, complex_ode
 from scipy.linalg import eigh
 from scipy.stats import special_ortho_group
@@ -15,30 +13,30 @@ def add_to_diag(arr: np.ndarray, to_add: Union[int, list]):
     arr[idx] += to_add
 
 
-def tensor_to_matrix(tensor: np.ndarray, system_shape: tuple[int, ...]) -> np.ndarray:
+def tensor_to_matrix(tensor: np.ndarray, system_shape: Tuple) -> np.ndarray:
     matrix_shape = get_system_matrix_shape(system_shape)
     return tensor.reshape(matrix_shape[0], matrix_shape[1])
 
 
-def matrix_to_tensor(matrix: np.ndarray, system_shape: tuple[int, ...]) -> np.ndarray:
+def matrix_to_tensor(matrix: np.ndarray, system_shape: Tuple) -> np.ndarray:
     return matrix.reshape(system_shape)
 
 
-def get_system_matrix_shape(system_shape: tuple[int, ...]):
+def get_system_matrix_shape(system_shape: Tuple):
     num_dims = len(system_shape)
     shape1 = np.prod(system_shape[:num_dims // 2])
     shape2 = np.prod(system_shape[num_dims // 2:])
     return shape1, shape2
 
 
-def site_and_sublattice_to_flat_index(site: np.ndarray[int], sublattice: int, system_shape: tuple[int]) -> int:
+def site_and_sublattice_to_flat_index(site: np.ndarray, sublattice: int, system_shape: Tuple) -> int:
     if isinstance(site, int):
         site = np.array([site])
     return np.ravel_multi_index((*site, sublattice), system_shape[:len(system_shape) // 2])
 
 
 class SingleParticleDensityMatrix(metaclass=ABCMeta):
-    def __init__(self, system_shape: tuple[int, ...], matrix: np.ndarray = None, tensor: np.ndarray = None):
+    def __init__(self, system_shape: Tuple, matrix: np.ndarray = None, tensor: np.ndarray = None):
         self.system_shape = system_shape
         self.matrix = None
         if matrix is not None:
@@ -66,7 +64,6 @@ class SingleParticleDensityMatrix(metaclass=ABCMeta):
     def randomize(self):
         pass
 
-    @jit()
     def evolve_with_unitary(self, Ud: np.ndarray):
         self._matrix = Ud.conj() @ self._matrix @ Ud.T
 
@@ -90,7 +87,7 @@ class MajoranaSingleParticleDensityMatrix(SingleParticleDensityMatrix):
 
         self._matrix = np.zeros(get_system_matrix_shape(self.system_shape))
 
-    def reset(self, sublattice1: int, sublattice2: int, site1: np.ndarray[int], site2: np.ndarray[int]):
+    def reset(self, sublattice1: int, sublattice2: int, site1: np.ndarray, site2: np.ndarray):
         """resets i*c^sublattice1_site1*c^sublattice2_site2 -> 1"""
         flat_idx1 = site_and_sublattice_to_flat_index(site1, sublattice1, self.system_shape)
         flat_idx2 = site_and_sublattice_to_flat_index(site2, sublattice2, self.system_shape)
@@ -106,7 +103,7 @@ class ComplexSingleParticleDensityMatrix(SingleParticleDensityMatrix):
     def randomize(self):
         self._matrix = 0.5*np.eye(get_system_matrix_shape(self.system_shape)[0], dtype=complex)
 
-    def reset(self, sublattice1: int, sublattice2: int, site1: np.ndarray[int], site2: np.ndarray[int]):
+    def reset(self, sublattice1: int, sublattice2: int, site1: np.ndarray, site2: np.ndarray):
         """resets c^dag^sublattice1_site1*c^sublattice2_site2 -> 0.5i"""
         flat_idx1 = site_and_sublattice_to_flat_index(site1, sublattice1, self.system_shape)
         flat_idx2 = site_and_sublattice_to_flat_index(site2, sublattice2, self.system_shape)
@@ -117,19 +114,19 @@ class ComplexSingleParticleDensityMatrix(SingleParticleDensityMatrix):
 
 class FreeFermionHamiltonianTerm(metaclass=ABCMeta):
     def __init__(self,
-                 strength: Union[float, list[float], complex],
+                 strength: Union[float, list, complex],
                  sublattice1: int,
                  sublattice2: int,
-                 system_shape: tuple[int, ...],
-                 site1: Optional[Union[int, tuple[int, ...], np.ndarray[int]]] = None,
-                 site2: Optional[Union[int, tuple[int, ...], np.ndarray[int]]] = None,
-                 site_offset: Optional[Union[int, tuple[int, ...], np.ndarray[int]]] = None,
-                 time_dependence: Optional[Callable] = None,
-                 gauge_field: Optional[MajoranaSingleParticleDensityMatrix] = None,
-                 gauge_sublattice1: Optional[int] = None,
-                 gauge_sublattice2: Optional[int] = None,
-                 gauge_site_offset1: Optional[Union[int, tuple[int, ...], np.ndarray[int]]] = None,
-                 gauge_site_offset2: Optional[Union[int, tuple[int, ...], np.ndarray[int]]] = None,
+                 system_shape: Tuple,
+                 site1: Optional = None,
+                 site2: Optional = None,
+                 site_offset: Optional = None,
+                 time_dependence: Optional = None,
+                 gauge_field: Optional = None,
+                 gauge_sublattice1: Optional = None,
+                 gauge_sublattice2: Optional = None,
+                 gauge_site_offset1: Optional = None,
+                 gauge_site_offset2: Optional = None,
                  dt: float = None,
                  periodic_bc=False):
         self.periodic_bc = periodic_bc
@@ -160,7 +157,7 @@ class FreeFermionHamiltonianTerm(metaclass=ABCMeta):
         return self._strength
 
     @strength.setter
-    def strength(self, new_strength: Union[float, np.ndarray[float]]):
+    def strength(self, new_strength: Union[float, np.ndarray]):
         self._strength = new_strength
         self._time_independent_tensor = self.get_zeros_tensor()
         if self.gauge_field is None:
@@ -299,7 +296,7 @@ class ComplexFreeFermionHamiltonianTerm(FreeFermionHamiltonianTerm):
 
 
 class FreeFermionHamiltonian(metaclass=ABCMeta):
-    def __init__(self, system_shape: tuple[int, ...], dt: float = None):
+    def __init__(self, system_shape: Tuple, dt: float = None):
         self.terms = {}
         self.system_shape = system_shape
         self.dt = dt
@@ -399,8 +396,8 @@ class MajoranaFreeFermionHamiltonian(FreeFermionHamiltonian):
         M = self.get_matrix(t)
         return (M @ c.reshape(M.shape[1], -1)).reshape(-1)
 
-    def full_cycle_unitary_trotterize(self, t0: float, tf: float, steps: Optional[float] = None,
-                                      atol: Optional[float] = None) -> np.ndarray:
+    def full_cycle_unitary_trotterize(self, t0: float, tf: float, steps: Optional = None,
+                                      atol: Optional = None) -> np.ndarray:
         if atol is None:
             if steps is not None:
                 self.dt = (tf - t0) / steps
@@ -469,7 +466,7 @@ class ComplexFreeFermionHamiltonian(FreeFermionHamiltonian):
         return e
 
 
-def get_fermion_bilinear_unitary(system_shape: tuple[int, ...],
+def get_fermion_bilinear_unitary(system_shape: Tuple,
                                  sublattice1: int, sublattice2: int, site1: int, site2: int):
     term = MajoranaFreeFermionHamiltonianTerm(system_shape=system_shape, strength=1, sublattice1=sublattice1,
                                               sublattice2=sublattice2,
