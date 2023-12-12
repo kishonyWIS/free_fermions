@@ -1,4 +1,7 @@
 from __future__ import annotations
+
+from itertools import product
+
 import numpy as np
 from KSL_with_noise.correcting_fluxes import KSL_flux_corrector
 import pandas as pd
@@ -8,28 +11,29 @@ from KSL_model import cool_KSL
 np.random.seed(0)
 
 def run():
-    num_sites_x = 10
-    num_sites_y_list = [10]
+    num_sites_x_list = [4]
+    num_sites_y_list = [4]
     g0 = 0.5
     B1 = 0.
-    B0 = 5.
+    B0 = 12.
     J = 1.
     kappa = 1.
     periodic_bc = (True, False)
     cycles_averaging_buffer = 98
     initial_state = "ground"
-    draw_spatial_energy = False
+    draw_spatial_energy = 'last'
 
     cycles = 100
 
-    T_list = np.arange(1,10,3)
+    T_list = np.arange(1,21,4)
+    trotter_steps_per_T = 40
     errors_per_cycle_per_qubit = [0.]  # [1e-99], np.linspace(1e-99, 0.02, 10)
 
-    for num_sites_y in num_sites_y_list:
+    for num_sites_x, num_sites_y in product(num_sites_x_list, num_sites_y_list):
 
         for T in T_list:
 
-            trotter_steps = int(T * 40)
+            trotter_steps = int(T * trotter_steps_per_T)
 
             t1 = T / 4
             smoothed_g = lambda t: get_g(t, g0, T, t1)
@@ -57,14 +61,8 @@ def run():
                 print(energy_above_ground[-1])
 
 
-                with open("KSL_results_averaged_edge.csv", 'a') as f:
+                with open("KSL_results_B_12.csv", 'a') as f:
                     results_df_averaged.to_csv(f, mode='a', header=f.tell()==0, index=False)
 
 if __name__ == '__main__':
-    import cProfile, pstats
-    profiler = cProfile.Profile()
-    profiler.enable()
     run()
-    profiler.disable()
-    stats = pstats.Stats(profiler).sort_stats('ncalls')
-    stats.print_stats()

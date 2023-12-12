@@ -5,9 +5,9 @@ import matplotlib as mpl
 import pandas as pd
 
 results_df = pd.read_csv("KSL_complex_chern.csv")
-n_k_points = 85
-results_df = results_df.query(f"n_k_points == {n_k_points}")
-
+n_k_points = [1+6*14]
+kappa = 1.
+results_df = results_df.query(f"n_k_points in {n_k_points}")
 markers = itertools.cycle(['o', 's', '^', '*', '8', 'p', 'd', 'v'])
 prop_cycle = plt.rcParams['axes.prop_cycle']
 colors = itertools.cycle(prop_cycle.by_key()['color'])

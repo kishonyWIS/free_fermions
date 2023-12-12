@@ -1,7 +1,6 @@
 from abc import ABCMeta, abstractmethod
 from typing import Union, Callable, Optional
 import numpy as np
-from memory_profiler import profile
 from numba import jit
 from scipy.integrate import ode, complex_ode
 from scipy.linalg import eigh
@@ -66,9 +65,8 @@ class SingleParticleDensityMatrix(metaclass=ABCMeta):
     def randomize(self):
         pass
 
-    @jit()
     def evolve_with_unitary(self, Ud: np.ndarray):
-        self._matrix = Ud.conj() @ self._matrix @ Ud.T
+        self._matrix = evolve_with_unitary_jit(self._matrix, Ud)
 
     @abstractmethod
     def reset(self, sublattice1, sublattice2, site1, site2):
@@ -100,6 +98,9 @@ class MajoranaSingleParticleDensityMatrix(SingleParticleDensityMatrix):
         # real and does not effect further time evolution or resets.
         self._matrix[np.ix_([flat_idx1, flat_idx2], [flat_idx1, flat_idx2])] = np.array([[0, 1], [-1, 0]])
 
+@jit(nopython=True)
+def evolve_with_unitary_jit(matrix: np.ndarray, Ud: np.ndarray):
+    return Ud @ matrix @ Ud.T.conj()
 
 class ComplexSingleParticleDensityMatrix(SingleParticleDensityMatrix):
     '''This is the expectation value of c^dag_a*c_b'''

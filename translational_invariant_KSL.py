@@ -33,9 +33,9 @@ def get_KSL_model(f, Delta, g, B, initial_state='random', num_cooling_sublattice
     system_shape = (num_sites, num_sublattices, num_sites, num_sublattices)
 
     hamiltonian = TranslationInvariantKSLHamiltonian(system_shape, dt=1.)
-    hamiltonian.add_term(name='Delta_plus', strength=Delta/2., sublattice1=0, sublattice2=0, site_offset=0)
-    hamiltonian.add_term(name='Delta_minus', strength=-Delta/2., sublattice1=1, sublattice2=1, site_offset=0)
-    hamiltonian.add_term(name='f', strength=1j*f, sublattice1=0, sublattice2=1, site_offset=0)
+    hamiltonian.add_term(name='Delta_plus', strength=Delta/4., sublattice1=0, sublattice2=0, site_offset=(0,))
+    hamiltonian.add_term(name='Delta_minus', strength=-Delta/4., sublattice1=1, sublattice2=1, site_offset=(0,))
+    hamiltonian.add_term(name='f', strength=1j*f/2., sublattice1=0, sublattice2=1, site_offset=(0,))
 
     ground_state = hamiltonian.get_ground_state()
     E_gs = ground_state.get_energy(hamiltonian.get_matrix())
@@ -46,10 +46,10 @@ def get_KSL_model(f, Delta, g, B, initial_state='random', num_cooling_sublattice
     if num_cooling_sublattices == 1:
         g_strengthB = 0
 
-    hamiltonian.add_term(name='g_A', strength=g_strengthA, sublattice1=0, sublattice2=2, site_offset=0, time_dependence=g)
-    hamiltonian.add_term(name='g_B', strength=g_strengthB, sublattice1=1, sublattice2=3, site_offset=0, time_dependence=g)
-    hamiltonian.add_term(name='B_A', strength=1j, sublattice1=2, sublattice2=4, site_offset=0, time_dependence=B)
-    hamiltonian.add_term(name='B_B', strength=1j, sublattice1=3, sublattice2=5, site_offset=0, time_dependence=B)
+    hamiltonian.add_term(name='g_A', strength=g_strengthA, sublattice1=0, sublattice2=2, site_offset=(0,), time_dependence=g)
+    hamiltonian.add_term(name='g_B', strength=g_strengthB, sublattice1=1, sublattice2=3, site_offset=(0,), time_dependence=g)
+    hamiltonian.add_term(name='B_A', strength=1j, sublattice1=2, sublattice2=4, site_offset=(0,), time_dependence=B)
+    hamiltonian.add_term(name='B_B', strength=1j, sublattice1=3, sublattice2=5, site_offset=(0,), time_dependence=B)
 
     if initial_state == 'random':
         S = TranslationInvariantKSLState(system_shape)

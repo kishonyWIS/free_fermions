@@ -1,7 +1,4 @@
 import numpy as np
-from memory_profiler import profile
-from numba import jit
-
 from correcting_fluxes import KSL_flux_corrector
 from energy_distribution import EnergyDistribution
 from free_fermion_hamiltonian import MajoranaFreeFermionHamiltonian, MajoranaSingleParticleDensityMatrix, \
@@ -38,32 +35,12 @@ class KSLHamiltonian(MajoranaFreeFermionHamiltonian):
     #         Ud = self.small_unitary(term_name, t + self.dt / 2) @ Ud
     #     return Ud
 
-    @jit()
     def _unitary_trotterize_run_step(self, Ud, t):
-        Jx = self.small_unitary('Jx', t + self.dt / 2)
-        Jy = self.small_unitary('Jy', t + self.dt / 2)
-        Jz = self.small_unitary('Jz', t + self.dt / 2)
-        kappa_x_A_0 = self.small_unitary('kappa_x_sublattice_A_shift_0', t + self.dt / 2)
-        kappa_y_A_0 = self.small_unitary('kappa_y_sublattice_A_shift_0', t + self.dt / 2)
-        kappa_z_A_0 = self.small_unitary('kappa_z_sublattice_A_shift_0', t + self.dt / 2)
-        kappa_x_B_0 = self.small_unitary('kappa_x_sublattice_B_shift_0', t + self.dt / 2)
-        kappa_y_B_0 = self.small_unitary('kappa_y_sublattice_B_shift_0', t + self.dt / 2)
-        kappa_z_B_0 = self.small_unitary('kappa_z_sublattice_B_shift_0', t + self.dt / 2)
-        kappa_x_A_1 = self.small_unitary('kappa_x_sublattice_A_shift_1', t + self.dt / 2)
-        kappa_y_A_1 = self.small_unitary('kappa_y_sublattice_A_shift_1', t + self.dt / 2)
-        kappa_z_A_1 = self.small_unitary('kappa_z_sublattice_A_shift_1', t + self.dt / 2)
-        kappa_x_B_1 = self.small_unitary('kappa_x_sublattice_B_shift_1', t + self.dt / 2)
-        kappa_y_B_1 = self.small_unitary('kappa_y_sublattice_B_shift_1', t + self.dt / 2)
-        kappa_z_B_1 = self.small_unitary('kappa_z_sublattice_B_shift_1', t + self.dt / 2)
-        g_0 = self.small_unitary('g_0', t + self.dt / 2)
-        g_1 = self.small_unitary('g_1', t + self.dt / 2)
-        B_0 = self.small_unitary('B_0', t + self.dt / 2)
-        B_1 = self.small_unitary('B_1', t + self.dt / 2)
-        small_U = B_0 @ B_1 @ Jx @ g_0 @ g_1 @ kappa_x_A_0 @ kappa_x_B_0 @ kappa_x_A_1 @ kappa_x_B_1 @ kappa_y_A_0 @ kappa_y_B_0 @ kappa_y_A_1 @ kappa_y_B_1 @ kappa_z_A_0 @ kappa_z_B_0 @ kappa_z_A_1 @ kappa_z_B_1 @ Jy @ Jz
-        small_U_reversed = Jz @ Jy @ kappa_z_B_1 @ kappa_z_A_1 @ kappa_z_B_0 @ kappa_z_A_0 @ kappa_y_B_1 @ kappa_y_A_1 @ kappa_y_B_0 @ kappa_y_A_0 @ kappa_x_B_1 @ kappa_x_A_1 @ kappa_x_B_0 @ kappa_x_A_0 @ g_1 @ g_0 @ Jx @ B_1 @ B_0
-        Ud = (small_U @ small_U_reversed) @ Ud
+        for term_name in self.terms:
+            Ud = self.small_unitary(term_name, t + self.dt / 2) @ Ud
+        for term_name in reversed(self.terms):
+            Ud = self.small_unitary(term_name, t + self.dt / 2) @ Ud
         return Ud
-
 
 def get_KSL_model(num_sites_x, num_sites_y, J, kappa, g, B, initial_state, periodic_bc):
     # sublattices are numbered c_0, b^1_0, b^2_0, b^3_0, b^4_0, b^5_0, c_1, b^1_1, b^2_1, b^3_1, b^4_1, b^5_1
@@ -319,26 +296,25 @@ def cool_KSL(num_sites_x, num_sites_y, J, kappa, smoothed_g, smoothed_B, initial
 
 
 if __name__ == '__main__':
-    num_sites_x = 10
-    num_sites_y = 10
+    num_sites_x = 6
+    num_sites_y = 6
     g0 = 0.5
     B1 = 0.
-    B0 = 5.
+    B0 = 12.
     J = 1.
     kappa = 1.
-    periodic_bc = (True, False)
-    cycles_averaging_buffer = 3
+    periodic_bc = True
+    cycles_averaging_buffer = 98
     initial_state = "ground"
-    draw_spatial_energy = "average"
+    draw_spatial_energy = "last"
 
-    cycles = 50
+    cycles = 100
 
-    trotter_steps = 200
-
-    T_list = [5.]
-    errors_per_cycle_per_qubit = np.linspace(1e-99, 0.02, 10)  # [1e-99], np.linspace(1e-99, 0.02, 10)
+    T_list = [5., 10., 15., 20., 25., 30., 35., 40.]
+    errors_per_cycle_per_qubit = [0.]  # [0.], np.linspace(0., 0.02, 10)
 
     for T in T_list:
+        trotter_steps = int(T * 40)
 
         t1 = T / 4
         smoothed_g = lambda t: get_g(t, g0, T, t1)

@@ -17,7 +17,7 @@ for T in T_list:
     t1 = T / 4
 
     trotter_steps = 100
-    cycles = 50
+    cycles = 1
 
     # smoothed_g_before_zeroing = lambda t: get_smoothed_func(t, lambda tt: get_g(tt, g0, T, t1), T/10)
     # smoothed_B_before_zeroing = lambda t: get_smoothed_func(t, lambda tt: get_B(tt, B0, B1, T, t1), T/10)

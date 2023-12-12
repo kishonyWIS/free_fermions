@@ -8,14 +8,14 @@ from translational_invariant_KSL import get_KSL_model, get_Delta, get_f
 
 g0 = 0.5
 B1 = 0.
-B0 = 5.
+B0 = 7.
 
-kappa = 0.1
+kappa = 1.
 Jx = 1.
 Jy = 1.
 Jz = 1.
 
-integration_params = dict(name='vode', nsteps=2000, rtol=1e-6, atol=1e-10)
+integration_params = dict(name='vode', nsteps=6000, rtol=1e-6, atol=1e-10)
 
 
 cycles = 1
@@ -31,13 +31,13 @@ def get_chern_number_from_single_particle_dm(single_particle_dm):
     return (np.sum(integrand)/(2*np.pi)).imag
 
 
-for n_k_points in [1+6*nn for nn in [14]]:
+for n_k_points in [1+6*nn for nn in [1]]:
 
     kx_list = np.linspace(-np.pi, np.pi, n_k_points)
     ky_list = np.linspace(-np.pi, np.pi, n_k_points)
 
 
-    for T in [110,130,150]:#10,30,50,70,90
+    for T in [50]:#10,30,50,70,90
         t1 = T / 4
 
         smoothed_g = lambda t: get_g(t, g0, T, t1)
@@ -49,6 +49,9 @@ for n_k_points in [1+6*nn for nn in [14]]:
 
         single_particle_dm = np.zeros((n_k_points, n_k_points, 6, 6), dtype=complex)
 
+        # t_list = np.linspace(0, T, 100)
+        # spectrum = np.zeros((len(t_list), 6))
+
         for i_kx, kx in enumerate(kx_list):
             print(f'kx={kx}')
             for i_ky, ky in enumerate(ky_list):
@@ -58,6 +61,11 @@ for n_k_points in [1+6*nn for nn in [14]]:
 
                 hamiltonian, S, E_gs = \
                     get_KSL_model(f=f, Delta=Delta, g=smoothed_g, B=smoothed_B, initial_state='product', num_cooling_sublattices=num_cooling_sublattices)
+                # for i_t, t in enumerate(t_list):
+                #     spectrum[i_t,:] = 2*hamiltonian.get_excitation_spectrum(t)
+                # plt.figure()
+                # plt.plot(t_list, spectrum)
+
                 Ud = hamiltonian.full_cycle_unitary_faster(integration_params, 0, T)
                 Es = []
                 cycle = 0

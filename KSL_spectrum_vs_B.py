@@ -8,7 +8,7 @@ import seaborn as sns
 import matplotlib as mpl
 
 
-B0 = 5.
+B0 = 7.
 B1 = 0.
 g0 = 0.5
 
@@ -22,7 +22,7 @@ for i_num_cooling_sublattices, num_cooling_sublattices in enumerate([2,1]):
     B_list = np.linspace(B1, B0, 100)
     spectrum = np.zeros((len(B_list),6))
     for iB, B in enumerate(B_list):
-        kappa = 0.1
+        kappa = 1
 
         Jx = 1
         Jy = 1
@@ -31,8 +31,8 @@ for i_num_cooling_sublattices, num_cooling_sublattices in enumerate([2,1]):
         n_k_points = 1+6*2
 
 
-        kx = 2/3*np.pi
-        ky = -2/3*np.pi
+        kx = 2/3*np.pi # 2/3*np.pi, 0
+        ky = -2/3*np.pi # -2/3*np.pi, np.pi
 
 
         f = get_f(kx, ky, Jx, Jy, Jz)
@@ -44,7 +44,7 @@ for i_num_cooling_sublattices, num_cooling_sublattices in enumerate([2,1]):
         hamiltonian, S, E_gs = \
             get_KSL_model(f=f, Delta=Delta, g=lambda tt:g0, B=lambda tt:B, initial_state='random', num_cooling_sublattices=num_cooling_sublattices)
 
-        spectrum[iB,:] = hamiltonian.get_excitation_spectrum(0)
+        spectrum[iB,:] = 2*hamiltonian.get_excitation_spectrum(0) # double because k and -k are the same
 
     with sns.axes_style("whitegrid"):
         rc = {"font.family": "serif",
