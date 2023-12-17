@@ -18,12 +18,14 @@ with sns.axes_style("whitegrid"):
     plt.figure()
     marker = next(markers)
     color = next(colors)
+    # sort by T
+    results_df = results_df.sort_values(by=['T'])
     plt.plot(results_df['T'], results_df.system_chern_number, linestyle='-', marker=marker, color=color, label=f'system')
     plt.plot(results_df['T'], results_df.bath_chern_number, linestyle='--', marker=marker, color=color, label=f'bath')
     plt.xlabel('$T$', fontsize='27', fontname='Times New Roman')#, fontweight='bold')
     plt.ylabel('$\\nu$', fontsize='27', fontname='Times New Roman')#, fontweight='bold')
     plt.tick_params(axis='both', which='major', labelsize=20)
-    l = plt.legend(prop=mpl.font_manager.FontProperties(family='Times New Roman', size=20), loc='upper left', ncol=1, columnspacing=0.3, handletextpad=0.3, borderpad=0.3)
+    l = plt.legend(prop=mpl.font_manager.FontProperties(family='Times New Roman', size=20), loc='upper left', ncol=1, columnspacing=0.3, handletextpad=0.3, borderpad=0.2)
     # l.set_title(title='system size',
     #             prop=mpl.font_manager.FontProperties(family='Times New Roman', size=22))
     plt.tight_layout()

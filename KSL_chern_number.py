@@ -5,6 +5,7 @@ from matplotlib import pyplot as plt
 import pandas as pd
 from time_dependence_functions import get_g, get_B
 from translational_invariant_KSL import get_KSL_model, get_Delta, get_f
+from scipy.linalg import expm
 
 g0 = 0.5
 B1 = 0.
@@ -31,13 +32,13 @@ def get_chern_number_from_single_particle_dm(single_particle_dm):
     return (np.sum(integrand)/(2*np.pi)).imag
 
 
-for n_k_points in [1+6*nn for nn in [1]]:
+for n_k_points in [1+6*nn for nn in [14]]:
 
     kx_list = np.linspace(-np.pi, np.pi, n_k_points)
     ky_list = np.linspace(-np.pi, np.pi, n_k_points)
 
 
-    for T in [50]:#10,30,50,70,90
+    for T in [10]:#10,30,50,70,90
         t1 = T / 4
 
         smoothed_g = lambda t: get_g(t, g0, T, t1)
@@ -67,6 +68,7 @@ for n_k_points in [1+6*nn for nn in [1]]:
                 # plt.plot(t_list, spectrum)
 
                 Ud = hamiltonian.full_cycle_unitary_faster(integration_params, 0, T)
+
                 Es = []
                 cycle = 0
                 Es.append(S.get_energy(hamiltonian.get_matrix(T)))
@@ -101,9 +103,10 @@ for n_k_points in [1+6*nn for nn in [1]]:
 
         results_df = pd.DataFrame({'Jx': Jx, 'Jy': Jy, 'Jz': Jz, 'kappa': kappa, 'B0': B0, 'g0': g0,
                                    'n_k_points': n_k_points, 'T': T, 'num_cooling_sublattices': num_cooling_sublattices,
-                                   'energy_density': np.mean(E_diff), 'total_chern_number': total_chern_number,
+                                   'energy_density': np.mean(E_diff)/2, 'total_chern_number': total_chern_number,
                                    'system_chern_number': system_chern_number, 'bath_chern_number': bath_chern_number},
                                   index=[0])
+        # np.mean(E_diff)/2 because we count k and -k together.
 
         with open("KSL_complex_chern.csv", 'a') as f:
             results_df.to_csv(f, mode='a', header=f.tell()==0, index=False)

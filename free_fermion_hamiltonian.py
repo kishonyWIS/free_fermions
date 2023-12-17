@@ -364,8 +364,6 @@ class FreeFermionHamiltonian(metaclass=ABCMeta):
         return evolve_vectorize(c_basis, integration_params=integration_params, t0=t0, tf=tf).T
 
     def full_cycle_unitary_faster(self, integration_params: dict, t0: float, tf: float) -> np.ndarray:
-        if np.all([x.time_dependence is None for x in self.terms.values()]):
-            return expm(self.get_matrix() * (tf - t0))
         c_basis = np.eye(np.prod(self.system_shape[:len(self.system_shape)//2])).reshape(-1)
         return self.evolve_single_fermion_faster(c_basis, integration_params=integration_params, t0=t0, tf=tf).reshape(
             *get_system_matrix_shape(self.system_shape))
@@ -452,11 +450,11 @@ class ComplexFreeFermionHamiltonian(FreeFermionHamiltonian):
         return complex_ode(dcdt)
 
     def dcdt(self, t: float, c: np.ndarray) -> np.ndarray:
-        return 1j/4*np.dot(self.get_matrix(t), c.reshape(-1, 1)).reshape(-1)
+        return 1j/4*np.dot(self.get_matrix(t).conj(), c.reshape(-1, 1)).reshape(-1)
 
     def dcdt_faster(self, t: float, c: np.ndarray) -> np.ndarray:
         M = self.get_matrix(t)
-        return 1j/4*(M @ c.reshape(M.shape[1], -1)).reshape(-1)
+        return 1j/4*(M.conj() @ c.reshape(M.shape[1], -1)).reshape(-1)
 
     def get_ground_state(self, t: float = None) -> ComplexSingleParticleDensityMatrix:
         M = self.get_matrix(t)

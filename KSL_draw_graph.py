@@ -21,6 +21,8 @@ with sns.axes_style("whitegrid"):
     for num_cooling_sublattices, group in groups:
         marker = next(markers)
         color = next(colors)
+        # sort by T
+        group = group.sort_values(by=['T'])
         ax.semilogy(group['T'], group.energy_density, linestyle='-', color=color, marker=marker, markersize=10, label=f'{num_cooling_sublattices}')
     plt.xlabel('$T$', fontsize='50', fontname='Times New Roman')#, fontweight='bold')
     plt.ylabel('Energy density', fontsize='50', fontname='Times New Roman')#, fontweight='bold')

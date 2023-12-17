@@ -10,7 +10,7 @@ from matplotlib import pyplot as plt
 from KSL_model import cool_KSL
 np.random.seed(0)
 
-def run():
+if __name__ == '__main__':
     num_sites_x_list = [4]
     num_sites_y_list = [4]
     g0 = 0.5
@@ -18,7 +18,7 @@ def run():
     B0 = 12.
     J = 1.
     kappa = 1.
-    periodic_bc = (True, False)
+    periodic_bc = True
     cycles_averaging_buffer = 98
     initial_state = "ground"
     draw_spatial_energy = 'last'
@@ -63,6 +63,3 @@ def run():
 
                 with open("KSL_results_B_12.csv", 'a') as f:
                     results_df_averaged.to_csv(f, mode='a', header=f.tell()==0, index=False)
-
-if __name__ == '__main__':
-    run()
