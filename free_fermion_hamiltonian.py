@@ -66,7 +66,10 @@ class SingleParticleDensityMatrix(metaclass=ABCMeta):
         pass
 
     def evolve_with_unitary(self, Ud: np.ndarray):
-        self._matrix = evolve_with_unitary_jit(self._matrix, Ud)
+        if isinstance(Ud, np.ndarray):
+            self._matrix = evolve_with_unitary_jit(self._matrix, Ud)
+        else:
+            self._matrix = Ud @ self._matrix @ Ud.T.conj()
 
     @abstractmethod
     def reset(self, sublattice1, sublattice2, site1, site2):

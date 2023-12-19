@@ -7,7 +7,7 @@ import matplotlib as mpl
 
 g0 = 0.5
 B1 = 0.
-B0 = 12.
+B0 = 7.
 J = 1.
 kappa = 1.
 periodic_bc = "'(True, False)'" # 'TRUE', "'(True, False)'", True

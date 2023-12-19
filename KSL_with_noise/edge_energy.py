@@ -11,11 +11,11 @@ from KSL_model import cool_KSL
 np.random.seed(0)
 
 if __name__ == '__main__':
-    num_sites_x_list = [4]
-    num_sites_y_list = [4]
+    num_sites_x_list = [10]
+    num_sites_y_list = [10]
     g0 = 0.5
     B1 = 0.
-    B0 = 12.
+    B0 = 7.
     J = 1.
     kappa = 1.
     periodic_bc = True
@@ -27,7 +27,7 @@ if __name__ == '__main__':
 
     T_list = np.arange(1,21,4)
     trotter_steps_per_T = 40
-    errors_per_cycle_per_qubit = [0.]  # [1e-99], np.linspace(1e-99, 0.02, 10)
+    errors_per_cycle_per_qubit = [0.]  # np.linspace(0., 0.02, 10)
 
     for num_sites_x, num_sites_y in product(num_sites_x_list, num_sites_y_list):
 

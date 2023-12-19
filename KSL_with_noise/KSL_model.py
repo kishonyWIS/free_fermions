@@ -258,12 +258,13 @@ def cool_KSL(num_sites_x, num_sites_y, J, kappa, smoothed_g, smoothed_B, initial
 
             # correct fluxes
             fluxes = S.fluxes(periodic_bc)
-            correction_names = flux_corrector.correct(fluxes)
-            for correction_name in correction_names:
-                S.evolve_with_unitary(all_errors_unitaries[correction_name])
-            if any(errors_effect_gauge[correction_name] for correction_name in correction_names):
-                hamiltonian.set_new_gauge()
-                Ud = hamiltonian.full_cycle_unitary_trotterize(0, T, steps=trotter_steps)
+            if flux_corrector is not None:
+                correction_names = flux_corrector.correct(fluxes)
+                for correction_name in correction_names:
+                    S.evolve_with_unitary(all_errors_unitaries[correction_name])
+                if any(errors_effect_gauge[correction_name] for correction_name in correction_names):
+                    hamiltonian.set_new_gauge()
+                    Ud = hamiltonian.full_cycle_unitary_trotterize(0, T, steps=trotter_steps)
 
             flux_x, flux_y = S.fluxes_around_torus()
             fluxes_x.append(flux_x)
@@ -300,18 +301,18 @@ if __name__ == '__main__':
     num_sites_y = 6
     g0 = 0.5
     B1 = 0.
-    B0 = 12.
+    B0 = 7.
     J = 1.
     kappa = 1.
     periodic_bc = True
-    cycles_averaging_buffer = 98
+    cycles_averaging_buffer = 0
     initial_state = "ground"
-    draw_spatial_energy = "last"
+    draw_spatial_energy = False
 
-    cycles = 100
+    cycles = 50
 
-    T_list = [5., 10., 15., 20., 25., 30., 35., 40.]
-    errors_per_cycle_per_qubit = [0.]  # [0.], np.linspace(0., 0.02, 10)
+    T_list = [20.]
+    errors_per_cycle_per_qubit = [0.001]  # [0.], np.linspace(0., 0.02, 10)
 
     for T in T_list:
         trotter_steps = int(T * 40)
