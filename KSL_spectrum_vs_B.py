@@ -44,7 +44,7 @@ for i_num_cooling_sublattices, num_cooling_sublattices in enumerate([2,1]):
         hamiltonian, S, E_gs = \
             get_KSL_model(f=f, Delta=Delta, g=lambda tt:g0, B=lambda tt:B, initial_state='random', num_cooling_sublattices=num_cooling_sublattices)
 
-        spectrum[iB,:] = 2*hamiltonian.get_excitation_spectrum(0) # double because k and -k are the same
+        spectrum[iB,:] = hamiltonian.get_excitation_spectrum(0) # double because k and -k are the same
 
     with sns.axes_style("whitegrid"):
         rc = {"font.family": "serif",
