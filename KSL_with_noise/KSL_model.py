@@ -36,9 +36,9 @@ class KSLHamiltonian(MajoranaFreeFermionHamiltonian):
     #     return Ud
 
     def _unitary_trotterize_run_step(self, Ud, t):
-        for term_name in self.terms:
+        for term_name in list(self.terms.keys()):
             Ud = self.small_unitary(term_name, t + self.dt / 2) @ Ud
-        for term_name in reversed(self.terms):
+        for term_name in list(self.terms.keys())[::-1]:
             Ud = self.small_unitary(term_name, t + self.dt / 2) @ Ud
         return Ud
 
@@ -204,6 +204,7 @@ def cool_KSL(num_sites_x, num_sites_y, J, kappa, smoothed_g, smoothed_B, initial
         get_KSL_model(num_sites_x, num_sites_y, J, kappa, smoothed_g, smoothed_B, initial_state=initial_state, periodic_bc=periodic_bc)
     Ud = hamiltonian.full_cycle_unitary_trotterize(0, T, steps=trotter_steps)
     Es = []
+    num_corrections = []
     fluxes_x = []
     fluxes_y = []
     cycle = 0
@@ -260,6 +261,7 @@ def cool_KSL(num_sites_x, num_sites_y, J, kappa, smoothed_g, smoothed_B, initial
             fluxes = S.fluxes(periodic_bc)
             if flux_corrector is not None:
                 correction_names = flux_corrector.correct(fluxes)
+                num_corrections.append(len(correction_names))
                 for correction_name in correction_names:
                     S.evolve_with_unitary(all_errors_unitaries[correction_name])
                 if any(errors_effect_gauge[correction_name] for correction_name in correction_names):
@@ -292,7 +294,7 @@ def cool_KSL(num_sites_x, num_sites_y, J, kappa, smoothed_g, smoothed_B, initial
         spatial_energy.draw(filename=spatial_energy_filename+'.pdf')
         spatial_energy.save(filename=spatial_energy_filename+'.pkl')
 
-    return np.array(Es)-E_gs, fluxes_x, fluxes_y
+    return np.array(Es)-E_gs, fluxes_x, fluxes_y, num_corrections
 
 
 
@@ -327,7 +329,7 @@ if __name__ == '__main__':
 
             errors_per_cycle = error_rate * num_sites_x * num_sites_y * 4
 
-            energy_above_ground, flux_x, flux_y = cool_KSL(num_sites_x, num_sites_y, J, kappa, smoothed_g, smoothed_B, initial_state=initial_state, periodic_bc=periodic_bc, cycles=cycles, errors_per_cycle=errors_per_cycle, trotter_steps=trotter_steps, T=T, flux_corrector=flux_corrector, g0=g0, B0=B0, cycles_averaging_buffer=cycles_averaging_buffer, draw_spatial_energy=draw_spatial_energy)
+            energy_above_ground, flux_x, flux_y, num_corrections = cool_KSL(num_sites_x, num_sites_y, J, kappa, smoothed_g, smoothed_B, initial_state=initial_state, periodic_bc=periodic_bc, cycles=cycles, errors_per_cycle=errors_per_cycle, trotter_steps=trotter_steps, T=T, flux_corrector=flux_corrector, g0=g0, B0=B0, cycles_averaging_buffer=cycles_averaging_buffer, draw_spatial_energy=draw_spatial_energy)
 
             results_df_averaged = pd.Series(
                 {'num_sites_x': num_sites_x, 'num_sites_y': num_sites_y, 'periodic_bc': periodic_bc, 'J': J,
@@ -342,7 +344,7 @@ if __name__ == '__main__':
                     {'num_sites_x': num_sites_x, 'num_sites_y': num_sites_y, 'periodic_bc': periodic_bc, 'J': J,
                      'kappa': kappa, 'g': g0, 'B': B0, 'T': T, 'Nt': trotter_steps, 'N_iter': cycle,
                      'errors_per_cycle_per_qubit': error_rate, 'energy_density': energy_above_ground[cycle] / num_sites_x / num_sites_y, 'initial_state': initial_state,
-                     'flux_x': flux_x[cycle], 'flux_y': flux_y[cycle]}).to_frame().transpose()
+                     'flux_x': flux_x[cycle], 'flux_y': flux_y[cycle], 'num_corrections': num_corrections[cycle]}).to_frame().transpose()
                 results_df = pd.concat([results_df, new_row], ignore_index=True)
 
             # plt.figure()
