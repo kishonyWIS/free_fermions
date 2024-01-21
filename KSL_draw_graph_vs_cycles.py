@@ -22,7 +22,7 @@ with sns.axes_style("whitegrid"):
         color = next(colors)
         groups_system_size = group_T.groupby(["n_k_points"])
         for n_k_points, group_system_size in groups_system_size:
-            plt.semilogy(group_system_size['cycles'][:8], group_system_size.energy_density[:8] - min(group_system_size.energy_density), marker=marker, color=color, label=f'{T}, {n_k_points}')
+            plt.semilogy(group_system_size['cycles'][:7], group_system_size.energy_density[:7] - min(group_system_size.energy_density), marker=marker, color=color, label=f'{T}')
     plt.xlabel('$n$ (cycle no.)', fontsize='20', fontname='Times New Roman')#, fontweight='bold')
     plt.ylabel('$e - e_\mathrm{steady}$', fontsize='20', fontname='Times New Roman')#, fontweight='bold')
     plt.tick_params(axis='both', which='major', labelsize=15)
