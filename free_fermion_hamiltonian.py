@@ -429,10 +429,10 @@ class MajoranaFreeFermionHamiltonian(FreeFermionHamiltonian):
         return Ud
 
     def _unitary_trotterize_run_step(self, Ud, t):
-        for term in self.terms.values():
-            Ud = term.small_unitary(t + self.dt / 2) @ Ud
-        for term in self.terms.values()[::-1]:
-            Ud = term.small_unitary(t + self.dt / 2) @ Ud
+        for term in list(self.terms.values()):
+            Ud = term.small_unitary(t + self.dt / 2, dt_factor=0.5) @ Ud
+        for term in list(self.terms.values())[::-1]:
+            Ud = term.small_unitary(t + self.dt / 2, dt_factor=0.5) @ Ud
         return Ud
 
     def get_ground_state(self, t: float = None) -> MajoranaSingleParticleDensityMatrix:

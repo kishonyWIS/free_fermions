@@ -10,7 +10,7 @@ import random
 from scipy.stats import gaussian_kde
 from scipy.optimize import minimize
 
-def edit_graph(xlabel, ylabel, legend_title=None, colorbar_title=None, colormap=None, colorbar_args={}, tight=True, ylabelpad=None):
+def edit_graph(xlabel, ylabel, ax=None, legend_title=None, colorbar_title=None, colormap=None, colorbar_args={}, tight=True, ylabelpad=None):
     sns.set_style("whitegrid")
     rc = {"font.family": "serif",
           "mathtext.fontset": "stix",
@@ -27,9 +27,9 @@ def edit_graph(xlabel, ylabel, legend_title=None, colorbar_title=None, colormap=
         if colormap:
             cmap = mpl.cm.ScalarMappable(norm=None, cmap=colormap)
             cmap.set_array([])
-            cbar = plt.colorbar(cmap,**colorbar_args)
+            cbar = plt.colorbar(cmap,ax=ax,**colorbar_args)
         else:
-            cbar = plt.colorbar(**colorbar_args)
+            cbar = plt.colorbar(ax=ax,**colorbar_args)
         cbar.set_label(colorbar_title, fontsize='20', fontname='Times New Roman')
         cbar.ax.tick_params(labelsize=15)
     if tight:
@@ -63,6 +63,7 @@ def get_floquet_KSL_model(num_sites_x, num_sites_y, J, pulse_length=1/20, vortex
 
 
     #vortex is given by location_dependent_delay which is the angle/(2*pi) in the x-y plane of the bond location around the vortex
+    vortex_center = None
     if vortex_location == 'bond':
         vortex_center = tuple(np.array(hexagonal_lattice_site_to_x_y((num_sites_x // 2, num_sites_y // 2, 0))) + np.array(
             (0.5, 0)))  # on bond
@@ -122,11 +123,10 @@ def draw_lattice(system_shape, state=None, hamiltonian:MajoranaFreeFermionHamilt
     # draw all sites as circles with size according to the absolute value of the state and color according to the phase
     # this part draws the hamiltonian terms as lines between the sites with color according to the term name being x, y or z
     # the lines are drawn at the center of the site but are not contained in a circle of radius circle_radius which is also drawn
-    arrow_to_circle_scale = 0.9
     colormap = mpl.colormaps['viridis']
     if ax is None:
         fig, ax = plt.subplots()
-    xyz_to_color = {'x': 'b', 'y': 'g', 'z': 'r'}
+    # xyz_to_color = {'x': 'b', 'y': 'g', 'z': 'r'}
     xyz_to_delay = {'x': 0, 'y':1/3, 'z':2/3}
 
     # this part draws the state by drawing arrows pointing according to the phase and with size according to the absolute value
@@ -139,16 +139,13 @@ def draw_lattice(system_shape, state=None, hamiltonian:MajoranaFreeFermionHamilt
 
     circles = []
     colors = []
-    circles_colormap = matplotlib.cm.get_cmap('gray').reversed()
+    circles_colormap = matplotlib.colormaps['gray'].reversed()
     max_strength = np.max(np.abs(state))**2 if state is not None else 1
     for site in np.ndindex(lattice_shape):
         x, y = hexagonal_lattice_site_to_x_y(site)
         if state is not None:
             site_phase = phase[site]
             strength = (np.abs(state[site])**2)/max_strength
-            # ax.quiver(x, y, arrow_to_circle_scale*2*circle_radius*np.cos(site_phase), arrow_to_circle_scale*2*circle_radius*np.sin(site_phase),
-            #           scale=1,
-            #           units='xy', pivot='middle', alpha=strength, zorder=2)
         else:
             strength = 0
         # draw a circle at the center of the site with a radius of circle_radius and color in grayscale according to the strength
@@ -179,18 +176,19 @@ def draw_lattice(system_shape, state=None, hamiltonian:MajoranaFreeFermionHamilt
             delay = xyz_to_delay[name[1]] + (location_dependent_delay(*bond_center) if location_dependent_delay else 0)
             delay = delay % 1
             if color_bonds_by == 'xyz':
-                color = xyz_to_color[name[1]]
+                color = colormap(xyz_to_delay[name[1]])#xyz_to_color[name[1]]
             if color_bonds_by == 'delay':
                 color = colormap(delay)
             ax.plot([x1_at_circle_edge, x2_at_circle_edge], [y1_at_circle_edge, y2_at_circle_edge], color=color, linewidth=2, zorder=0)
-            # ax.text(bond_center[0],bond_center[1],'{0:.2f}'.format(delay),horizontalalignment='center',verticalalignment='center',
-            #         fontsize=10, fontname='Times New Roman')
     if color_bonds_by == 'delay' and add_colorbar==True:
-        edit_graph(None, None, colorbar_title='Pulse Delay', colormap=colormap,
+        edit_graph(None, None, ax=ax, colorbar_title='Pulse Delay', colormap=colormap,
                    colorbar_args={'orientation':'horizontal', 'pad':-0.15, 'aspect':30, 'shrink':0.5}, tight=False)
 
     ax.axis('equal')
-    plt.axis('off')
+    if ax is not None:
+        ax.axis('off')
+    else:
+        plt.axis('off')
 
 # Function to calculate jitter amount proportional to the density of points
 def calculate_jitter_amount(data, bandwidth=0.5):
@@ -237,7 +235,7 @@ def draw_spectrum(energies, distance_from_vortex, ax=None, colormap='plasma'):
     ax.scatter(jittered_x, energies, c=distance_from_vortex, cmap=colormap, s=30, zorder=4)
     ax.set_aspect(1)
 
-    edit_graph('Density of States', 'Energy', colorbar_title='Distance from Time Vortex', colormap=colormap)
+    edit_graph('Density of States', 'Energy', colorbar_title='Distance from Time Vortex', ax=ax, colormap=colormap)
 
 
 def get_vortex_and_edge_state(energies, states, vortex_center, system_shape):
@@ -257,14 +255,12 @@ def get_vortex_and_edge_state(energies, states, vortex_center, system_shape):
 
 
 if __name__ == "__main__":
-    integration_params = dict(name='vode', nsteps=2000, rtol=1e-10, atol=1e-14)
     J = np.pi/4*0.9
     pulse_length = 1/2
     vortex_location = 'plaquette'
     num_sites_x = 6
     num_sites_y = 6
     hamiltonian, location_dependent_delay, vortex_center = get_floquet_KSL_model(num_sites_x, num_sites_y, J=J, pulse_length=pulse_length, vortex_location=vortex_location)
-    # unitary = hamiltonian.full_cycle_unitary_faster(integration_params, 0, 1)
     unitary = hamiltonian.full_cycle_unitary_trotterize(0, 1, 1000)
     # draw the real and imaginary parts of the unitary as subplots with colorbars for each
     fig, ax = plt.subplots(1, 2)
