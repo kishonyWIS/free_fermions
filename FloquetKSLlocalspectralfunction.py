@@ -1,3 +1,5 @@
+import os
+
 import matplotlib.pyplot as plt
 
 from FloquetKSL import *
@@ -25,11 +27,11 @@ class LocalSpectralFunction():
         unitary = np.eye(self.matrix_shape)
         for i in range(step_start, step_start + cycles*self.steps):
             unitary = self.small_unitaries[i%self.steps] @ unitary
-            unitary_vs_delta_t.append(unitary.copy())
+            unitary_vs_delta_t.append(np.diag(unitary).copy())
         return np.array(unitary_vs_delta_t)
 
     def get_time_averaged_unitary(self, cycles=1, start_time_steps=None, fourier=False):
-        unitary_vs_delta_t_averaged = np.zeros((cycles*self.steps, self.matrix_shape, self.matrix_shape))
+        unitary_vs_delta_t_averaged = np.zeros((cycles*self.steps, self.matrix_shape))
         if start_time_steps is None:
             start_time_steps = self.steps
         for i in range(0, self.steps, start_time_steps):
@@ -54,14 +56,24 @@ if __name__ == '__main__':
     hamiltonian, location_dependent_delay, vortex_center = get_floquet_KSL_model(num_sites_x, num_sites_y, J=J,
                                                                                  pulse_length=pulse_length,
                                                                                  vortex_location=vortex_location)
-    steps = 1800
+    steps = 300
     start_time_steps = 30
     cycles = 100
-    local_spectral_function = LocalSpectralFunction(hamiltonian, steps)
-    angular_frequencies, unitary_vs_omega = local_spectral_function.get_time_averaged_unitary(cycles=cycles, start_time_steps=start_time_steps, fourier=True)
-    unitary_vs_omega_diag = np.diagonal(unitary_vs_omega, axis1=1, axis2=2)
-    unitary_vs_omega_diag = unitary_vs_omega_diag.reshape(steps*cycles, *hamiltonian.system_shape[:len(hamiltonian.system_shape)//2])
-    unitary_vs_omega = unitary_vs_omega.reshape(steps*cycles, *hamiltonian.system_shape)
+
+    # load if already calculated
+    # check if file exists
+    filename = f'graphs/time_vortex/unitary_vs_omega_num_sites_x_{num_sites_x}_num_sites_y_{num_sites_y}_J_{J:.2f}_pulse_length_{pulse_length:.2f}.npz'
+    if os.path.isfile(filename):
+        data = np.load(filename)
+        unitary_vs_omega = data['unitary_vs_omega']
+        angular_frequencies = data['angular_frequencies']
+    else:
+        local_spectral_function = LocalSpectralFunction(hamiltonian, steps)
+        angular_frequencies, unitary_vs_omega = local_spectral_function.get_time_averaged_unitary(cycles=cycles, start_time_steps=start_time_steps, fourier=True)
+        unitary_vs_omega = unitary_vs_omega.reshape(steps*cycles, *hamiltonian.system_shape[:len(hamiltonian.system_shape)//2])
+        # save the data including steps, cycles, start_time_steps, num_sites_x, num_sites_y, J, pulse_length
+        np.savez(filename, unitary_vs_omega=unitary_vs_omega, angular_frequencies=angular_frequencies)
+
 
     # average over sites around the vortex
     sites_distance_from_vortex = np.zeros(hamiltonian.system_shape[:len(hamiltonian.system_shape)//2])
@@ -70,7 +82,7 @@ if __name__ == '__main__':
         sites_distance_from_vortex[site] = np.sqrt((vortex_center[0]-x)**2 + (vortex_center[1]-y)**2)
     closest_distance = np.min(sites_distance_from_vortex)
     closest_sites_to_vortex = np.where(np.abs(sites_distance_from_vortex - closest_distance)<0.01)
-    unitary_vs_omega_close_to_vortex = unitary_vs_omega_diag[:, closest_sites_to_vortex[0], closest_sites_to_vortex[1], closest_sites_to_vortex[2]]
+    unitary_vs_omega_close_to_vortex = unitary_vs_omega[:, closest_sites_to_vortex[0], closest_sites_to_vortex[1], closest_sites_to_vortex[2]]
     unitary_vs_omega_close_to_vortex = np.mean(unitary_vs_omega_close_to_vortex, axis=1)
     plt.plot(angular_frequencies, np.abs(unitary_vs_omega_close_to_vortex)/np.max(np.abs(unitary_vs_omega_close_to_vortex)))
     plt.xlim(-np.pi*1.05, np.pi*1.05)
@@ -81,7 +93,7 @@ if __name__ == '__main__':
 
     index_frequency_pi = np.argmin(np.abs(angular_frequencies - np.pi))
     # is this the right normalization?
-    unitary_at_pi = unitary_vs_omega_diag[index_frequency_pi, :, :, :].copy()
+    unitary_at_pi = unitary_vs_omega[index_frequency_pi, :, :, :].copy()
     draw_lattice(hamiltonian.system_shape, np.abs(unitary_at_pi), hamiltonian, location_dependent_delay=location_dependent_delay,
                  color_bonds_by='delay', add_colorbar=False)
     edit_graph(None, None)
