@@ -118,7 +118,7 @@ def get_x_y_of_bond_center_from_site1_site2(site1, site2):
     x, y = (x1+x2)/2, (y1+y2)/2
     return x, y
 
-def draw_lattice(system_shape, state=None, hamiltonian:MajoranaFreeFermionHamiltonian = None, circle_radius=1 / 3, ax=None,
+def draw_lattice(system_shape, shading=None, hamiltonian:MajoranaFreeFermionHamiltonian = None, circle_radius=1 / 3, ax=None,
                  location_dependent_delay=None, color_bonds_by='xyz', add_colorbar=True):
     # draw all sites as circles with size according to the absolute value of the state and color according to the phase
     # this part draws the hamiltonian terms as lines between the sites with color according to the term name being x, y or z
@@ -133,19 +133,18 @@ def draw_lattice(system_shape, state=None, hamiltonian:MajoranaFreeFermionHamilt
     # the arrows are drawn at the center of the site and are contained in a circle of radius 1/2 which is also drawn
 
     lattice_shape = system_shape[:len(system_shape) // 2]
-    if state is not None:
-        state = state.reshape(lattice_shape)
-        phase = np.angle(state)
+    if shading is not None:
+        shading = shading.reshape(lattice_shape)
+        phase = np.angle(shading)
 
     circles = []
     colors = []
     circles_colormap = matplotlib.colormaps['gray'].reversed()
-    max_strength = np.max(np.abs(state))**2 if state is not None else 1
+    max_strength = np.max(np.abs(shading)) if shading is not None else 1
     for site in np.ndindex(lattice_shape):
         x, y = hexagonal_lattice_site_to_x_y(site)
-        if state is not None:
-            site_phase = phase[site]
-            strength = (np.abs(state[site])**2)/max_strength
+        if shading is not None:
+            strength = shading[site] / max_strength
         else:
             strength = 0
         # draw a circle at the center of the site with a radius of circle_radius and color in grayscale according to the strength
@@ -156,7 +155,7 @@ def draw_lattice(system_shape, state=None, hamiltonian:MajoranaFreeFermionHamilt
         circles.append(circle)
     coll = matplotlib.collections.PatchCollection(circles, cmap=circles_colormap, zorder=1, match_original=True)
     ax.add_collection(coll)
-    if state is not None:
+    if shading is not None:
         cbar = plt.colorbar(coll, orientation='horizontal', aspect=30, shrink=0.5, ticks=[0, 0.5, 1])
         cbar.ax.tick_params(labelsize=18)
         cbar.ax.set_xticklabels(list(map('{0:.2f}'.format,[0,max_strength/2,max_strength])), fontname='Times New Roman')
@@ -304,14 +303,14 @@ if __name__ == "__main__":
     final_state = unitary @ initial_state
     # draw the initial and final states in subplots
     _, ax = plt.subplots(1, 2)
-    draw_lattice(hamiltonian.system_shape, initial_state, hamiltonian, location_dependent_delay=location_dependent_delay, ax=ax[0])
-    draw_lattice(hamiltonian.system_shape, final_state, hamiltonian, location_dependent_delay=location_dependent_delay, ax=ax[1])
+    draw_lattice(hamiltonian.system_shape, np.abs(initial_state)**2, hamiltonian, location_dependent_delay=location_dependent_delay, ax=ax[0])
+    draw_lattice(hamiltonian.system_shape, np.abs(final_state)**2, hamiltonian, location_dependent_delay=location_dependent_delay, ax=ax[1])
     ax[0].set_title('initial state')
     ax[1].set_title('final state')
 
 
     for i_state, (state, energy) in enumerate(zip(states.T, energies)):
-        draw_lattice(hamiltonian.system_shape, state, hamiltonian, location_dependent_delay=location_dependent_delay, color_bonds_by='delay', add_colorbar=False)
+        draw_lattice(hamiltonian.system_shape, np.abs(state)**2, hamiltonian, location_dependent_delay=location_dependent_delay, color_bonds_by='delay', add_colorbar=False)
         edit_graph(None, None)
         if i_state in [0, len(states)-1]:
             plt.savefig(

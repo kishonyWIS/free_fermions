@@ -21,7 +21,7 @@ def calculate_fourier_transform(sequence, dt, axis=-1, shift=True):
     angular_frequencies = 2 * np.pi * frequencies
 
     normalization_factor = np.sqrt(sequence.shape[axis] * 2 * np.pi)
-    fft_result = fft_result / normalization_factor
+    fft_result = fft_result #/ normalization_factor
 
     return angular_frequencies, fft_result
 
