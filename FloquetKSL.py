@@ -10,7 +10,23 @@ import random
 from scipy.stats import gaussian_kde
 from scipy.optimize import minimize
 
-def edit_graph(xlabel, ylabel, ax=None, legend_title=None, colorbar_title=None, colormap=None, colorbar_args={}, tight=True, ylabelpad=None):
+def rescale_linewidths(ax):
+    plt.tight_layout()
+    xlim = ax.get_xlim()
+    ylim = ax.get_ylim()
+    width = abs(xlim[1] - xlim[0])
+    height = abs(ylim[1] - ylim[0])
+    diagonal_length = np.sqrt(width**2 + height**2)
+    trans = ax.transData.transform
+    dpi = ax.get_figure().dpi
+    for line in ax.lines:
+        # linewidth = line.get_linewidth()
+        linewidth = ((trans((1, line.get_linewidth())) - trans((0, 0))) * 72./dpi)[1]
+        # line.set_linewidth(linewidth * ax.transData.transform((1, 0))[0]/100)
+        line.set_linewidth(linewidth)
+    plt.tight_layout()
+
+def edit_graph(xlabel, ylabel, ax=None, legend_title=None, colorbar_title=None, colormap=None, colorbar_args={}, tight=True, ylabelpad=None, colorbar_xticklabels=None, colorbar_yticklabels=None):
     sns.set_style("whitegrid")
     rc = {"font.family": "serif",
           "mathtext.fontset": "stix",
@@ -27,9 +43,13 @@ def edit_graph(xlabel, ylabel, ax=None, legend_title=None, colorbar_title=None, 
         if colormap:
             cmap = mpl.cm.ScalarMappable(norm=None, cmap=colormap)
             cmap.set_array([])
-            cbar = plt.colorbar(cmap,ax=ax,**colorbar_args)
+            cbar = plt.colorbar(cmap,ax=ax,ticks=[0, 1/3, 2/3, 1],**colorbar_args)
         else:
-            cbar = plt.colorbar(ax=ax,**colorbar_args)
+            cbar = plt.colorbar(ax=ax,ticks=[0, 1/3, 2/3, 1],**colorbar_args)
+        if colorbar_xticklabels:
+            cbar.ax.set_xticklabels(colorbar_xticklabels, fontname='Times New Roman')
+        if colorbar_yticklabels:
+            cbar.ax.set_yticklabels(colorbar_yticklabels, fontname='Times New Roman')
         cbar.set_label(colorbar_title, fontsize='20', fontname='Times New Roman')
         cbar.ax.tick_params(labelsize=15)
     if tight:
@@ -146,7 +166,7 @@ def draw_lattice(system_shape, shading=None, hamiltonian:MajoranaFreeFermionHami
         if shading is not None:
             strength = shading[site] / max_strength
         else:
-            strength = 0
+            strength = 1
         # draw a circle at the center of the site with a radius of circle_radius and color in grayscale according to the strength
         circle = Circle((x, y), circle_radius, color=circles_colormap(strength), fill=True)  # state is None)
         circles.append(circle)
@@ -178,11 +198,12 @@ def draw_lattice(system_shape, shading=None, hamiltonian:MajoranaFreeFermionHami
                 color = colormap(xyz_to_delay[name[1]])#xyz_to_color[name[1]]
             if color_bonds_by == 'delay':
                 color = colormap(delay)
-            ax.plot([x1_at_circle_edge, x2_at_circle_edge], [y1_at_circle_edge, y2_at_circle_edge], color=color, linewidth=2, zorder=0)
+            plt.plot([x1_at_circle_edge, x2_at_circle_edge], [y1_at_circle_edge, y2_at_circle_edge], color=color, linewidth=0.08, zorder=0)
     if color_bonds_by == 'delay' and add_colorbar==True:
         edit_graph(None, None, ax=ax, colorbar_title='Pulse Delay', colormap=colormap,
-                   colorbar_args={'orientation':'horizontal', 'pad':-0.15, 'aspect':30, 'shrink':0.5}, tight=False)
+                   colorbar_args={'orientation':'horizontal', 'pad':-0.15, 'aspect':30, 'shrink':0.5}, colorbar_xticklabels=['$0$', '$T/3$', '2T/3', '$T$'], tight=False)
 
+    rescale_linewidths(ax)
     ax.axis('equal')
     if ax is not None:
         ax.axis('off')
@@ -285,7 +306,7 @@ if __name__ == "__main__":
     plt.show()
 
     # draw the lattice with the xyz
-    draw_lattice(hamiltonian.system_shape, hamiltonian=hamiltonian, location_dependent_delay=location_dependent_delay, color_bonds_by='xyz', circle_radius=0.1)
+    draw_lattice(hamiltonian.system_shape, hamiltonian=hamiltonian, location_dependent_delay=None, color_bonds_by='delay', circle_radius=0.1)
     plt.savefig(
         f'graphs/time_vortex/xyz_on_the_lattice_Nx_{num_sites_x}_Ny_{num_sites_y}.pdf')
     plt.show()
