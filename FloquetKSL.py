@@ -40,12 +40,16 @@ def edit_graph(xlabel, ylabel, ax=None, legend_title=None, colorbar_title=None, 
         l = plt.legend(prop=mpl.font_manager.FontProperties(family='Times New Roman', size=15))
         l.set_title(title='$T$', prop=mpl.font_manager.FontProperties(family='Times New Roman', size=18))
     if colorbar_title:
+        if 'ticks' in colorbar_args:
+            ticks = colorbar_args.pop('ticks')
+        else:
+            ticks = [0, 1/3, 2/3, 1]
         if colormap:
             cmap = mpl.cm.ScalarMappable(norm=None, cmap=colormap)
             cmap.set_array([])
-            cbar = plt.colorbar(cmap,ax=ax,ticks=[0, 1/3, 2/3, 1],**colorbar_args)
+            cbar = plt.colorbar(cmap,ax=ax,ticks=ticks,**colorbar_args)
         else:
-            cbar = plt.colorbar(ax=ax,ticks=[0, 1/3, 2/3, 1],**colorbar_args)
+            cbar = plt.colorbar(ax=ax,ticks=ticks,**colorbar_args)
         if colorbar_xticklabels:
             cbar.ax.set_xticklabels(colorbar_xticklabels, fontname='Times New Roman')
         if colorbar_yticklabels:
