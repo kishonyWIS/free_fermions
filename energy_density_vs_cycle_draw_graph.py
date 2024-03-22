@@ -47,9 +47,9 @@ with sns.axes_style("whitegrid"):
         color = next(colors)
         group = group[group.Nt == group.Nt.max()]
         group_up_to_10_cycles = group.query("N_iter<=10")
-        plt.plot(group_up_to_10_cycles.N_iter, group_up_to_10_cycles.energy_density_spatial, linestyle='-', marker=marker,
+        plt.plot(group_up_to_10_cycles.N_iter, group_up_to_10_cycles.energy_density, linestyle='-', marker=marker,
                  color=color, label=f'{T}')
-        steady_state_energy_density[T] = group.energy_density_spatial.iloc[-1]
+        steady_state_energy_density[T] = group.energy_density.iloc[-1]
     ax.set_yscale('log')
     plt.xlabel('Cycle', fontsize='20', fontname='Times New Roman')#, fontweight='bold')
     plt.ylabel('Energy density', fontsize='20', fontname='Times New Roman')#, fontweight='bold')
