@@ -59,3 +59,4 @@ with sns.axes_style("whitegrid"):
                 prop=mpl.font_manager.FontProperties(family='Times New Roman', size=18))
     plt.tight_layout()
     plt.savefig(f'graphs/energy_vs_cycle_Ns_{Ns}_J_{J}_h_{h}_V_{V}_Nt_{Nt}.pdf')
+    plt.show()
