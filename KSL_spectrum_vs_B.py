@@ -15,7 +15,7 @@ g0 = 0.5
 prop_cycle = plt.rcParams['axes.prop_cycle']
 colors = itertools.cycle(prop_cycle.by_key()['color'])
 linestyles = itertools.cycle(['-',':'])
-labels = ['$g_A=0.5, g_B=0.5$', '$g_A=0.5, g_B=0$']
+labels = ['$g\Gamma_A=0.5, g\Gamma_B=0.5$', '$g\Gamma_A=0.5, g\Gamma_B=0$']
 
 for i_num_cooling_sublattices, num_cooling_sublattices in enumerate([2,1]):
 
