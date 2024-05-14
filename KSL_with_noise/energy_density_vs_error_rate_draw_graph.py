@@ -9,7 +9,7 @@ import numpy as np
 trotter_steps = 400
 num_sites_x = [10]
 num_sites_y = [10]
-cooling_half_life = 2
+cooling_half_life = 3*np.log(2)#2
 max_errors_per_cycle_per_qubit = 0.002
 periodic_bc = True
 
