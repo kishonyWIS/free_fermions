@@ -56,7 +56,7 @@ with sns.axes_style("whitegrid"):
     # plt.xscale('log')
     # plt.yscale('log')
     plt.xlabel('Errors per cycle per qubit', fontsize=str(20), fontname='Times New Roman')#, fontweight='bold')
-    plt.ylabel('$e_\mathrm{steady}$', fontsize=str(20), fontname='Times New Roman')#, fontweight='bold')
+    plt.ylabel('$\\varepsilon_s$', fontsize=str(24), fontname='Times New Roman')#, fontweight='bold')\mathrm{steady}
     plt.tick_params(axis='both', which='major', labelsize=15)
     plt.gca().set_ylim(bottom=0.)
     leg = plt.legend(prop=mpl.font_manager.FontProperties(family='Times New Roman', size=15), ncol=2)
