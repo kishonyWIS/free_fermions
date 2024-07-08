@@ -4,6 +4,7 @@ from scipy.linalg import eig
 from matplotlib import pyplot as plt
 import matplotlib as mpl
 from FloquetKSL import edit_graph
+from matplotlib.colors import LinearSegmentedColormap
 
 J = np.pi / 4 * 0.9
 pulse_length = 1/2
@@ -59,7 +60,17 @@ Y = np.zeros((2*num_sites_y, 2*num_sites_y))
 Y[::2,:] = 1.5*np.arange(num_sites_y).reshape(-1,1)
 Y[1::2,:] = 1.5*np.arange(num_sites_y).reshape(-1,1) + 0.5
 
-colormap = plt.get_cmap('jet')
+
+def truncate_colormap(cmap, min_val=0.0, max_val=1.0, n=100):
+    new_cmap = LinearSegmentedColormap.from_list(
+        f'trunc({cmap.name},{min_val:.2f},{max_val:.2f})',
+        cmap(np.linspace(min_val, max_val, n))
+    )
+    return new_cmap
+
+
+colormap = truncate_colormap(plt.get_cmap('jet'), 0.2, 0.8)
+
 
 for kx in kx_list:
     pulse_hamiltonians = {
