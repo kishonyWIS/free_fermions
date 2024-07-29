@@ -100,7 +100,7 @@ def get_floquet_KSL_model(num_sites_x, num_sites_y, J, pulse_length=1/20, vortex
     if vortex_location is None:
         location_dependent_delay = None
     else:
-        location_dependent_delay = lambda x, y: (np.arctan2(y - vortex_center[1], x - vortex_center[0]) + np.pi/2) / (2*np.pi)
+        location_dependent_delay = lambda x, y: (np.arctan2(y - vortex_center[1], x - vortex_center[0]) + 0*np.pi/2) / (2*np.pi)
 
     add_J_term(J_x_strength, 'x', hamiltonian, site_offset_x, 0, 1, lattice_shape, pulse_length=pulse_length, alpha_delay=0, location_dependent_delay=location_dependent_delay)
     add_J_term(J_y_strength, 'y', hamiltonian, site_offset_y, 1, 0, lattice_shape, pulse_length=pulse_length, alpha_delay=1 / 3, location_dependent_delay=location_dependent_delay)

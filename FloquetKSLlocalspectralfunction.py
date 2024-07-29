@@ -60,7 +60,6 @@ if __name__ == '__main__':
     start_time_steps = 30
     cycles = 10000
 
-
     for J, pulse_length in [(np.pi / 4 * 0.9, 1/2)]:#, (np.pi / 4 * 1, 1/6)]: #
         hamiltonian, location_dependent_delay, vortex_center = get_floquet_KSL_model(num_sites_x, num_sites_y, J=J,
                                                                                      pulse_length=pulse_length,
@@ -69,6 +68,7 @@ if __name__ == '__main__':
         # load if already calculated
         # check if file exists
         filename = f'graphs/time_vortex/unitary_vs_omega_num_sites_x_{num_sites_x}_num_sites_y_{num_sites_y}_J_{J:.2f}_pulse_length_{pulse_length:.2f}_steps_{steps}_cycles_{cycles}_start_time_steps_{start_time_steps}.npz'
+        print(filename)
         if os.path.isfile(filename):
             data = np.load(filename)
             unitary_vs_omega = data['unitary_vs_omega']

@@ -13,7 +13,7 @@ X, Y = R * np.cos(Theta), R * np.sin(Theta)
 
 for z in np.arange(4)*0.5:
     Z = np.ones_like(X)*z
-    delay = ((np.arctan2(Y, X)-Z) / (2*np.pi)) % 1
+    delay = ((-np.arctan2(Y, X)+Z) / (2*np.pi)) % 1
 
     ax.plot_surface(X, Y, Z, facecolors=colormap(delay), linewidth=0, antialiased=False)
 
@@ -27,7 +27,7 @@ for z in np.arange(4)*0.5:
 
 
 # set elevation and azimuth
-ax.view_init(26, 18)
+ax.view_init(26, 18-90)
 # remove grid
 ax.grid(False)
 # remove ticks
@@ -35,9 +35,10 @@ ax.set_xticks([])
 ax.set_yticks([])
 ax.set_zticks([])
 # set labels
-ax.set_xlabel('$y$', labelpad=-10, fontsize=30, fontname='Times New Roman')
-ax.set_ylabel('$x$', labelpad=-10, fontsize=30, fontname='Times New Roman')
+ax.set_xlabel('$x$', labelpad=-10, fontsize=30, fontname='Times New Roman')
+ax.set_ylabel('$y$', labelpad=-10, fontsize=30, fontname='Times New Roman')
 ax.set_zlabel('$t$', labelpad=-10, fontsize=30, fontname='Times New Roman')
+ax.zaxis._axinfo['juggled'] = (1,2,2)
 
 cbar = plt.colorbar(cm.ScalarMappable(cmap=colormap), ax=ax, shrink=0.6, ticks= [0,1], pad=-0.04)
 cbar.ax.set_yticklabels([0, '$T$'], fontname='Times New Roman', fontsize='22')

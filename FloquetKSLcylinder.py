@@ -3,8 +3,11 @@ from scipy.linalg import expm
 from scipy.linalg import eig
 from matplotlib import pyplot as plt
 import matplotlib as mpl
-from FloquetKSL import edit_graph
+# from FloquetKSL import edit_graph
+from plot_utils import edit_graph
+from plot_utils import *
 from matplotlib.colors import LinearSegmentedColormap
+set_latex_params()
 
 J = np.pi / 4 * 0.9
 pulse_length = 1/2
@@ -99,23 +102,27 @@ for kx in kx_list:
     colors = colors/np.max(Y)
     plt.scatter(kx*np.ones_like(energies), energies, color=colormap(colors), s=20)
 
-edit_graph('$k_x$', '$\\varepsilon$', tight=False)
-# increase fontsize
-plt.xticks(fontname='Times New Roman', fontsize=30)
-plt.yticks(fontname='Times New Roman', fontsize=30)
-# increase label fontsize
-plt.xlabel('$k_x$', fontname='Times New Roman', fontsize=45, labelpad=-2)
-plt.ylabel('$\\varepsilon$', fontname='Times New Roman', fontsize=45, labelpad=-30)
+# # increase fontsize
+# plt.xticks(fontname='Times New Roman', fontsize=30)
+# plt.yticks(fontname='Times New Roman', fontsize=30)
+# # increase label fontsize
+# plt.xlabel('$k_xa$', fontname='Times New Roman', fontsize=45, labelpad=-2)
+# plt.ylabel('$\\varepsilon T$', fontname='Times New Roman', fontsize=45, labelpad=-30)
 plt.xlim([0,2*np.pi])
 plt.ylim([-np.pi,np.pi])
-plt.xticks([0,np.pi,2*np.pi], ['0', '$\\pi$', '$2\\pi$'], fontname='Times New Roman')
-plt.yticks([-np.pi,0,np.pi], ['$-\\pi$', '0', '$\\pi$'], fontname='Times New Roman')
 cmap = mpl.cm.ScalarMappable(norm=None, cmap=colormap)
 cmap.set_array([])
 cbar = plt.colorbar(cmap, ax=ax, ticks= [0,1])
-cbar.ax.set_yticklabels(['0', '$N_y$'], fontname='Times New Roman', fontsize='30')
-cbar.set_label('$y$ center of mass', fontsize='30', fontname='Times New Roman', labelpad=-15)
-cbar.ax.tick_params(labelsize=30)
-plt.tight_layout()
+cbar.ax.set_yticklabels(['0', '$N_y$'])
+cbar.set_label('$y$ center of mass', labelpad=-15)
+# cbar.ax.tick_params(labelsize=30)
+edit_graph('$k_xa$', '$\\varepsilon T$', tight=False,
+           xticks=[0, np.pi, 2*np.pi], yticks=[-np.pi, 0, np.pi],
+           xticklabels=['0', '$\\pi$', '$2\\pi$'], yticklabels=['$-\\pi$', '0', '$\\pi$'], scale=2)
+#plt.xticks([0,np.pi,2*np.pi], ['0', '$\\pi$', '$2\\pi$'], fontname='Times New Roman')
+#plt.yticks([-np.pi,0,np.pi], ['$-\\pi$', '0', '$\\pi$'], fontname='Times New Roman')
+#turn off grid
+plt.grid(False)
+# plt.tight_layout()
 plt.savefig('graphs/time_vortex/FloquetKSLcylinder.pdf')
 plt.show()
