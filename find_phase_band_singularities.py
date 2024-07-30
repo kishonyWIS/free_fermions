@@ -8,7 +8,7 @@ import matplotlib
 from scipy.interpolate import LinearNDInterpolator
 
 
-def plot_singularities_3d(ky, res_grid, res_energy=0.1, ax=None, pulse_length = 1/3, plot=False):
+def plot_singularities_3d(ky, res_grid, res_energy=0.1, ax=None, pulse_length = 1/3, plot=False, plot_numerical_singularities=False):
     kx_list = np.linspace(0, np.pi, 101)
     theta_list = np.linspace(0, 2 * np.pi, 101)
     KX, THETA = np.meshgrid(kx_list, theta_list, indexing='ij')
@@ -69,7 +69,8 @@ def plot_singularities_3d(ky, res_grid, res_energy=0.1, ax=None, pulse_length = 
     size = 21
     pos = np.where(topological_singularities_0)
     zorder_0 = 1 if ky == np.pi else 30
-    # s = ax.scatter(kx_list[pos[0]], theta_list[pos[1]], times[pos[2]], c='r', s=20, alpha=1, zorder=zorder_0)
+    if plot_numerical_singularities:
+        s = ax.scatter(kx_list[pos[0]], theta_list[pos[1]], times[pos[2]], c='r', s=20, alpha=1, zorder=zorder_0)
     if plot:
         for point in point_singularities_0:
             # ax.scatter(point[0], point[1], point[2], c='r', s=size, alpha=1, zorder=zorder_0)
@@ -84,7 +85,8 @@ def plot_singularities_3d(ky, res_grid, res_energy=0.1, ax=None, pulse_length = 
 
     pos = np.where(topological_singularities_pi)
 
-    # s = ax.scatter(kx_list[pos[0]], theta_list[pos[1]], times[pos[2]], c='b', s=20, alpha=1, zorder=30)
+    if plot_numerical_singularities:
+        s = ax.scatter(kx_list[pos[0]], theta_list[pos[1]], times[pos[2]], c='b', s=20, alpha=1, zorder=30)
     # ax.plot([0, np.pi], [2 / 3 * np.pi, 2 / 3 * np.pi], [2 / 3, 2 / 3], c='b', alpha=1, linewidth=5,zorder=30)
     if plot:
         for point in point_singularities_pi:
@@ -97,5 +99,7 @@ def plot_singularities_3d(ky, res_grid, res_energy=0.1, ax=None, pulse_length = 
     #     TIME = interp(KX, THETA)
     #     surf = ax.plot_surface(KX, THETA, TIME, color='b', alpha=1, linewidth=0,
     #                            antialiased=True, zorder=30) #, cmap=matplotlib.cm.get_cmap("Blues")
+    if plot:
+        plt.show()
 
     return point_singularities_0, point_singularities_pi, line_singularities_0, line_singularities_pi
