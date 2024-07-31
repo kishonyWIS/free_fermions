@@ -14,30 +14,53 @@ def plot_singularities_3d(kx, res_grid, res_energy=0.1, ax=None, pulse_length = 
     KY, THETA = np.meshgrid(ky_list, theta_list, indexing='ij')
 
     if kx == 0.:
-        point_singularities_0 = [[np.pi, 0, 2/3]]
+        point_singularities_0 = []
         point_singularities_pi = []
-        line_singularities_0 = [[[np.pi, np.pi], [2*np.pi/3, 4*np.pi/3], [0, 2 / 3]],
-                                [[np.pi, np.pi], [4*np.pi/3, 2*np.pi], [0, 2 / 3]],
-                                [[np.pi, np.pi], [4*np.pi/3, 2*np.pi], [2/3, 2 / 3]]]
-        line_singularities_pi = [[[0, np.pi], [2 / 3 * np.pi, 2 / 3 * np.pi], [2 / 3, 2 / 3]],
-                                 [[0, 0],[0, 2*np.pi],[2/3, 2/3]]]
+        line_singularities_0 = [[[np.pi, np.pi], [0, 2*np.pi/3], [0, 2 / 3]],
+                                [[np.pi, np.pi], [2*np.pi/3, 4*np.pi/3], [0, 2 / 3]],
+                                [[np.pi, np.pi], [2*np.pi/3, 4*np.pi/3], [2/3, 2 / 3]]]
+        line_singularities_pi = [[[0, np.pi], [0, 0], [2 / 3, 2 / 3]],
+                                 [[0, np.pi], [2*np.pi, 2*np.pi], [2 / 3, 2 / 3]],
+                                 [[0, 0], [0, 2*np.pi], [2 / 3, 2 / 3]]]
         plane_singularities_0 = []
         plane_singularities_pi = []
+
+        #before changing kx and ky:
+        # point_singularities_0 = [[np.pi, 0, 2/3]]
+        # point_singularities_pi = []
+        # line_singularities_0 = [[[np.pi, np.pi], [2*np.pi/3, 4*np.pi/3], [0, 2 / 3]],
+        #                         [[np.pi, np.pi], [4*np.pi/3, 2*np.pi], [0, 2 / 3]],
+        #                         [[np.pi, np.pi], [4*np.pi/3, 2*np.pi], [2/3, 2 / 3]]]
+        # line_singularities_pi = [[[0, np.pi], [2 / 3 * np.pi, 2 / 3 * np.pi], [2 / 3, 2 / 3]],
+        #                          [[0, 0],[0, 2*np.pi],[2/3, 2/3]]]
+        # plane_singularities_0 = []
+        # plane_singularities_pi = []
     elif kx == np.pi:
         point_singularities_0 = []
-        point_singularities_pi = [[0,0,2/3], [0,2*np.pi,2/3], [np.pi,4/3*np.pi,2/3]]
-        line_singularities_0 = [[[np.pi, np.pi], [0, 2 * np.pi / 3], [2/3, 2 / 3]],
-                                [[0, 0], [2 * np.pi / 3, 4 * np.pi / 3], [2/3, 2 / 3]],
+        point_singularities_pi = [[0,2*np.pi/3,2/3], [np.pi,4*np.pi/3,2/3]]
+        line_singularities_0 = [[[0, np.pi], [0, 0], [2/3, 2 / 3]],
+                                [[0, 0], [4 * np.pi / 3, 2 * np.pi], [2/3, 2 / 3]],
+                                [[np.pi, np.pi], [0, 2 * np.pi / 3], [2/3, 2 / 3]],
                                 [[0, 0], [2 * np.pi / 3, 4 * np.pi / 3], [0, 2 / 3]],
-                                [[np.pi, np.pi], [4 * np.pi / 3, 2 * np.pi], [0, 2 / 3]]]
+                                [[np.pi, np.pi], [0, 2 * np.pi / 3], [0, 2 / 3]]]
         for ky in np.linspace(0,np.pi,100):
-            line_singularities_0.append([[ky,ky],[0,2/3*np.pi],[0,2/3]])
+            line_singularities_0.append([[ky,ky],[4/3*np.pi, 2*np.pi],[0,2/3]])
         line_singularities_pi = []
-        plane_singularities_0 = [[[0,0,0],
-                                 [np.pi,0,0],
-                                 [0,2*np.pi/3,2/3],
-                                 [np.pi,2*np.pi/3,2/3]]]
-        plane_singularities_pi = []
+
+        # point_singularities_0 = []
+        # point_singularities_pi = [[0,0,2/3], [0,2*np.pi,2/3], [np.pi,4/3*np.pi,2/3]]
+        # line_singularities_0 = [[[np.pi, np.pi], [0, 2 * np.pi / 3], [2/3, 2 / 3]],
+        #                         [[0, 0], [2 * np.pi / 3, 4 * np.pi / 3], [2/3, 2 / 3]],
+        #                         [[0, 0], [2 * np.pi / 3, 4 * np.pi / 3], [0, 2 / 3]],
+        #                         [[np.pi, np.pi], [4 * np.pi / 3, 2 * np.pi], [0, 2 / 3]]]
+        # for ky in np.linspace(0,np.pi,100):
+        #     line_singularities_0.append([[ky,ky],[0,2/3*np.pi],[0,2/3]])
+        # line_singularities_pi = []
+        # plane_singularities_0 = [[[0,0,0],
+        #                          [np.pi,0,0],
+        #                          [0,2*np.pi/3,2/3],
+        #                          [np.pi,2*np.pi/3,2/3]]]
+        # plane_singularities_pi = []
 
 
     ky_list = np.linspace(0, np.pi, res_grid//2)

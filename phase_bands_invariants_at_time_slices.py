@@ -71,22 +71,47 @@ states = np.zeros((len(ky_list), len(theta_list), 2, 2), dtype=np.complex128)
 if kx == 0.:
     anchors = [np.array([0,0,0.5]),
                np.array([0,2*np.pi,0.5]),
-               np.array([np.pi,0,5/6]),
-               np.array([np.pi,2*np.pi*2/3,5/6]),
-               np.array([np.pi,2*np.pi,5/6]),
-               np.array([np.pi,2*np.pi/3.,0.5])]
+               np.array([np.pi, 0, 0.5]),
+               np.array([np.pi, 2 * np.pi, 0.5]),
+               np.array([np.pi,2*np.pi/3,5/6]),
+               np.array([np.pi,4*np.pi/3,5/6])]
+
+    triangulation_mode = 'manual'  # 'manual' #'auto'
+    anchor_pairs_to_draw_lines = [[0,1], [0,2], [1,3], [0,4], [2,4], [1,5], [3,5], [4,5]]
+
+    # before changing kx and ky:
+    # anchors = [np.array([0,0,0.5]),
+    #            np.array([0,2*np.pi,0.5]),
+    #            np.array([np.pi,0,5/6]),
+    #            np.array([np.pi,2*np.pi*2/3,5/6]),
+    #            np.array([np.pi,2*np.pi,5/6]),
+    #            np.array([np.pi,2*np.pi/3.,0.5])]
 
 # between the zero and pi singularities for ky=np.pi
 
 if kx == np.pi:
-    anchors = [np.array([0,2*np.pi,0.5]),
-               np.array([0,0,0.5]),
-               np.array([np.pi,2*np.pi*2/3,0.5]),
-               np.array([0,2*np.pi*2/3,5/6]),
-               np.array([0,2*np.pi/3,5/6]),
-               np.array([np.pi,2*np.pi,5/6]),
-               np.array([np.pi,2*np.pi/3,5/6]),
-               np.array([np.pi,0,5/6])]
+    anchors = [np.array([0,0,5/6]),
+               np.array([0,2*np.pi/3+0.001,0.5]),
+               np.array([0,4*np.pi/3,5/6]),
+               np.array([0,2*np.pi,5/6]),
+               np.array([np.pi, 0, 5/6]),
+               np.array([np.pi, 2*np.pi/3, 5/6]),
+               np.array([np.pi, 4*np.pi/3-0.001, 0.5]),
+               np.array([np.pi, 2*np.pi, 5/6])
+               ]
+
+    triangulation_mode = 'manual'  # 'manual' #'auto'
+    anchor_pairs_to_draw_lines = [[0,1], [1,2], [2,3], [4,5], [5,6], [6,7], [0,4], [3,7], [1,6], [0,5], [2,7]]
+
+    # before changing kx and ky:
+    # anchors = [np.array([0,2*np.pi,0.5]),
+    #            np.array([0,0,0.5]),
+    #            np.array([np.pi,2*np.pi*2/3,0.5]),
+    #            np.array([0,2*np.pi*2/3,5/6]),
+    #            np.array([0,2*np.pi/3,5/6]),
+    #            np.array([np.pi,2*np.pi,5/6]),
+    #            np.array([np.pi,2*np.pi/3,5/6]),
+    #            np.array([np.pi,0,5/6])]
 
 interp = LinearNDInterpolator(np.array(anchors)[:,:-1], np.array(anchors)[:,-1])
 TIME = interp(KY, THETA)
@@ -114,33 +139,42 @@ plt.colorbar()
 
 fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
 ax.invert_zaxis()
-elev = 12.
-azim = 105
+elev = 17.
+azim = 110
 ax.view_init(elev=elev, azim=azim, vertical_axis='y')  # for ky=0, elev=10., azim=108, ky=pi, elev=12., azim=105
 ax.set_xticks([0, np.pi])
 ax.set_xticklabels([0, '$\pi/a$'])
 ax.set_yticks([0, 2 * np.pi / 3, 2 * np.pi * 2 / 3, 2 * np.pi])
-ax.set_yticklabels([0, '$\\frac{2\pi}{3}$', '$\\frac{4\pi}{3}$', '$2\pi$'])
+ax.set_yticklabels(['$0$', '$\\frac{1}{3}$', '$\\frac{2}{3}$', '$1$'])
 ax.set_zticks([0, 1 / 3, 2 / 3, 1])
 ax.set_zticklabels([0, '$T/3$', '$2T/3$', '$T$'])
-edit_graph('$k_y$', '$\\theta$', '$t$', ax)
+ax.set_zlim(1, 0)
+ax.set_xlim(0, np.pi)
+ax.set_ylim(0, 2 * np.pi)
+edit_graph('$k_y$', '$\\lambda$', '$t$', ax)
 
-mode = 'numerical' #'manual'
-if mode == 'numerical':
-    point_singularities_0, point_singularities_pi, line_singularities_0, line_singularities_pi =\
-        plot_singularities_3d(kx, 22, 0.05, ax, pulse_length=pulse_length, plot=False, plot_numerical_singularities=True)
-if mode == 'manual':
-    point_singularities_0, point_singularities_pi, line_singularities_0, line_singularities_pi =\
-        plot_singularities_3d(kx, 22, 0.05, ax, pulse_length=pulse_length, plot=False, plot_numerical_singularities=False)
+mode = 'manual' #'manual' #'both' #'numerical'
 
+point_singularities_0, point_singularities_pi, line_singularities_0, line_singularities_pi =\
+    plot_singularities_3d(kx, 22, 0.05, ax, pulse_length=pulse_length, plot=False,
+                          plot_numerical_singularities=(mode == 'numerical' or mode == 'both'))
+
+
+if mode == 'manual' or mode == 'both':
     surf = ax.plot_surface(KY, THETA, TIME, cmap=matplotlib.cm.plasma.reversed(), alpha=0.7, linewidth=0,
                            antialiased=True, zorder=3)
 
     anchors = np.array(anchors)
     tri = Delaunay(anchors[:, :-1])
     # Plot the edges of the triangles
-    for simplex in tri.simplices:
-        ax.plot_trisurf(anchors[simplex, 0], anchors[simplex, 1], anchors[simplex, 2], color='none', edgecolor='k')
+    if triangulation_mode == 'auto':
+        for simplex in tri.simplices:
+            ax.plot_trisurf(anchors[simplex, 0], anchors[simplex, 1], anchors[simplex, 2], color='none', edgecolor='k')
+    if triangulation_mode == 'manual':
+        for pair in anchor_pairs_to_draw_lines:
+            ax.plot([anchors[pair[0], 0], anchors[pair[1], 0]],
+                    [anchors[pair[0], 1], anchors[pair[1], 1]],
+                    [anchors[pair[0], 2], anchors[pair[1], 2]], c='k', linewidth=2, zorder=2)
 
     zorder_0 = 1 if kx == np.pi else 30
     for point in point_singularities_0:
@@ -176,14 +210,24 @@ if mode == 'manual':
     ))
 
     # Plot lines for the edges of the triangles
-    for simplex in tri.simplices:
-        fig.add_trace(go.Scatter3d(
-            x=anchors[simplex, 0],
-            y=anchors[simplex, 1],
-            z=anchors[simplex, 2],
-            mode='lines',
-            line=dict(color='black', width=3)
-        ))
+    if triangulation_mode == 'auto':
+        for simplex in tri.simplices:
+            fig.add_trace(go.Scatter3d(
+                x=anchors[simplex, 0],
+                y=anchors[simplex, 1],
+                z=anchors[simplex, 2],
+                mode='lines',
+                line=dict(color='black', width=3)
+            ))
+    if triangulation_mode == 'manual':
+        for pair in anchor_pairs_to_draw_lines:
+            fig.add_trace(go.Scatter3d(
+                x=[anchors[pair[0], 0], anchors[pair[1], 0]],
+                y=[anchors[pair[0], 1], anchors[pair[1], 1]],
+                z=[anchors[pair[0], 2], anchors[pair[1], 2]],
+                mode='lines',
+                line=dict(color='black', width=3)
+            ))
 
     width = 20
 
@@ -223,7 +267,7 @@ if mode == 'manual':
 
     fig.update_layout(scene=dict(
         xaxis_title=dict(text=u'kᵧ', font=dict(size=50)),
-        yaxis_title=dict(text=r'θ', font=dict(size=50)),
+        yaxis_title=dict(text=r'λ', font=dict(size=50)),
         zaxis_title=dict(text=r't', font=dict(size=50)),
         camera=dict(
             eye=dict(x=3*np.cos(np.deg2rad(elev))*np.sin(np.deg2rad(azim)),
@@ -239,7 +283,7 @@ if mode == 'manual':
         ),
         yaxis=dict(
             tickvals=[0, 2*np.pi/3, 4*np.pi/3, 2*np.pi],
-            ticktext=['0', '2π/3', '4π/3', '2π'],
+            ticktext=['0', '1/3', '2/3', '1'],
             tickfont=dict(size=20)
         ),
         zaxis=dict(
