@@ -57,7 +57,7 @@ plt.rcParams.update({
 })
 
 ky_list = np.linspace(0, np.pi, 101)
-kx = 0.#np.pi#0.#
+kx = np.pi#np.pi#0.#
 pulse_length = 1/3
 theta_list = np.linspace(0, 2*np.pi, 101)
 KY, THETA = np.meshgrid(ky_list, theta_list, indexing='ij')
@@ -66,52 +66,64 @@ u = np.zeros((len(ky_list), len(theta_list), 2, 2), dtype=np.complex128)
 angles = np.zeros((len(ky_list), len(theta_list), 2))
 states = np.zeros((len(ky_list), len(theta_list), 2, 2), dtype=np.complex128)
 
+plane_to_calculate_invariant = 'intermediate' #'T' 'intermediate'
 
-
-if kx == 0.:
-    anchors = [np.array([0,0,0.5]),
-               np.array([0,2*np.pi,0.5]),
-               np.array([np.pi, 0, 0.5]),
-               np.array([np.pi, 2 * np.pi, 0.5]),
-               np.array([np.pi,2*np.pi/3,5/6]),
-               np.array([np.pi,4*np.pi/3,5/6])]
-
-    triangulation_mode = 'manual'  # 'manual' #'auto'
-    anchor_pairs_to_draw_lines = [[0,1], [0,2], [1,3], [0,4], [2,4], [1,5], [3,5], [4,5]]
-
-    # before changing kx and ky:
-    # anchors = [np.array([0,0,0.5]),
-    #            np.array([0,2*np.pi,0.5]),
-    #            np.array([np.pi,0,5/6]),
-    #            np.array([np.pi,2*np.pi*2/3,5/6]),
-    #            np.array([np.pi,2*np.pi,5/6]),
-    #            np.array([np.pi,2*np.pi/3.,0.5])]
-
-# between the zero and pi singularities for ky=np.pi
-
-if kx == np.pi:
-    anchors = [np.array([0,0,5/6]),
-               np.array([0,2*np.pi/3+0.001,0.5]),
-               np.array([0,4*np.pi/3,5/6]),
-               np.array([0,2*np.pi,5/6]),
-               np.array([np.pi, 0, 5/6]),
-               np.array([np.pi, 2*np.pi/3, 5/6]),
-               np.array([np.pi, 4*np.pi/3-0.001, 0.5]),
-               np.array([np.pi, 2*np.pi, 5/6])
-               ]
+if plane_to_calculate_invariant == 'T':
+    # T plane corners:
+    anchors = [np.array([0, 0, 1]),
+               np.array([0, 2 * np.pi, 1]),
+               np.array([np.pi, 0, 1]),
+               np.array([np.pi, 2 * np.pi, 1])]
 
     triangulation_mode = 'manual'  # 'manual' #'auto'
-    anchor_pairs_to_draw_lines = [[0,1], [1,2], [2,3], [4,5], [5,6], [6,7], [0,4], [3,7], [1,6], [0,5], [2,7]]
+    anchor_pairs_to_draw_lines = [[0, 1], [0, 2], [1, 3], [2, 3]]
 
-    # before changing kx and ky:
-    # anchors = [np.array([0,2*np.pi,0.5]),
-    #            np.array([0,0,0.5]),
-    #            np.array([np.pi,2*np.pi*2/3,0.5]),
-    #            np.array([0,2*np.pi*2/3,5/6]),
-    #            np.array([0,2*np.pi/3,5/6]),
-    #            np.array([np.pi,2*np.pi,5/6]),
-    #            np.array([np.pi,2*np.pi/3,5/6]),
-    #            np.array([np.pi,0,5/6])]
+if plane_to_calculate_invariant == 'intermediate':
+    if kx == 0.:
+
+        anchors = [np.array([0,0,0.5]),
+                   np.array([0,2*np.pi,0.5]),
+                   np.array([np.pi, 0, 0.5]),
+                   np.array([np.pi, 2 * np.pi, 0.5]),
+                   np.array([np.pi,2*np.pi/3,5/6]),
+                   np.array([np.pi,4*np.pi/3,5/6])]
+
+        triangulation_mode = 'manual'  # 'manual' #'auto'
+        anchor_pairs_to_draw_lines = [[0,1], [0,2], [1,3], [0,4], [2,4], [1,5], [3,5], [4,5]]
+
+        # before changing kx and ky:
+        # anchors = [np.array([0,0,0.5]),
+        #            np.array([0,2*np.pi,0.5]),
+        #            np.array([np.pi,0,5/6]),
+        #            np.array([np.pi,2*np.pi*2/3,5/6]),
+        #            np.array([np.pi,2*np.pi,5/6]),
+        #            np.array([np.pi,2*np.pi/3.,0.5])]
+
+    # between the zero and pi singularities for ky=np.pi
+
+    if kx == np.pi:
+        anchors = [np.array([0,0,5/6]),
+                   np.array([0,2*np.pi/3+0.001,0.5]),
+                   np.array([0,4*np.pi/3,5/6]),
+                   np.array([0,2*np.pi,5/6]),
+                   np.array([np.pi, 0, 5/6]),
+                   np.array([np.pi, 2*np.pi/3, 5/6]),
+                   np.array([np.pi, 4*np.pi/3-0.001, 0.5]),
+                   np.array([np.pi, 2*np.pi, 5/6])
+                   ]
+
+        triangulation_mode = 'manual'  # 'manual' #'auto'
+        anchor_pairs_to_draw_lines = [[0,1], [1,2], [2,3], [4,5], [5,6], [6,7], [0,4], [3,7], [1,6], [0,5], [2,7]]
+
+        # before changing kx and ky:
+        # anchors = [np.array([0,2*np.pi,0.5]),
+        #            np.array([0,0,0.5]),
+        #            np.array([np.pi,2*np.pi*2/3,0.5]),
+        #            np.array([0,2*np.pi*2/3,5/6]),
+        #            np.array([0,2*np.pi/3,5/6]),
+        #            np.array([np.pi,2*np.pi,5/6]),
+        #            np.array([np.pi,2*np.pi/3,5/6]),
+        #            np.array([np.pi,0,5/6])]
 
 interp = LinearNDInterpolator(np.array(anchors)[:,:-1], np.array(anchors)[:,-1])
 TIME = interp(KY, THETA)
@@ -139,9 +151,10 @@ plt.colorbar()
 
 fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
 ax.invert_zaxis()
-elev = 17.
-azim = 110
+elev = 25.
+azim = 125
 ax.view_init(elev=elev, azim=azim, vertical_axis='y')  # for ky=0, elev=10., azim=108, ky=pi, elev=12., azim=105
+ax.set_proj_type('persp', focal_length=0.5)
 ax.set_xticks([0, np.pi])
 ax.set_xticklabels([0, '$\pi/a$'])
 ax.set_yticks([0, 2 * np.pi / 3, 2 * np.pi * 2 / 3, 2 * np.pi])
