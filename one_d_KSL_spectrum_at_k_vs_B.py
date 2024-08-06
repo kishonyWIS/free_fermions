@@ -50,17 +50,26 @@ for g in [0, g1]:
 
     g_rt2 = g*np.sqrt(2)
     B_list = np.linspace(B1, B0, 100)
-    spectrum = np.zeros((len(B_list),6))
+    # spectrum = np.zeros((len(B_list),6))
+    spectrum_even = np.zeros((len(B_list),3))
+    spectrum_odd = np.zeros((len(B_list),3))
     for iB, B in enumerate(B_list):
+        hamiltonian_even = np.array([[-E_k/2-B, g_rt2, 0],
+                                [g_rt2, E_k/2, g_rt2],
+                                [0, g_rt2, -E_k/2+B]])
+        hamiltonian_odd = np.array([[E_k/2-B, g_rt2, 0],
+                                [g_rt2, -E_k/2, g_rt2],
+                                [0, g_rt2, E_k/2+B]])
+        # hamiltonian = np.array([[-E_k/2-B, 0, 0, g_rt2, 0, 0],
+        #                         [0, E_k/2-B, g_rt2, 0, 0, 0],
+        #                         [0, g_rt2, -E_k/2, 0, 0, g_rt2],
+        #                         [g_rt2, 0, 0, E_k/2, g_rt2, 0],
+        #                         [0, 0, 0, g_rt2, -E_k/2+B, 0],
+        #                         [0, 0, g_rt2, 0, 0, E_k/2+B]])
 
-        hamiltonian = np.array([[-E_k/2-B, 0, 0, g_rt2, 0, 0],
-                                [0, E_k/2-B, g_rt2, 0, 0, 0],
-                                [0, g_rt2, -E_k/2, 0, 0, g_rt2],
-                                [g_rt2, 0, 0, E_k/2, g_rt2, 0],
-                                [0, 0, 0, g_rt2, -E_k/2+B, 0],
-                                [0, 0, g_rt2, 0, 0, E_k/2+B]])
-
-        spectrum[iB,:], _ = eigh(hamiltonian)
+        # spectrum[iB,:], _ = eigh(hamiltonian)
+        spectrum_even[iB,:], _ = eigh(hamiltonian_even)
+        spectrum_odd[iB,:], _ = eigh(hamiltonian_odd)
 
     with sns.axes_style("whitegrid"):
         rc = {"font.family": "serif",
@@ -73,7 +82,8 @@ for g in [0, g1]:
         linewidth = next(linewidths)
         linestyle = next(linestyles)
         # for ii in range(4):
-        handles.append(plt.plot(B_list, spectrum, 'b', linestyle=linestyle, linewidth=linewidth)[0])
+        handles.append(plt.plot(B_list, spectrum_even, 'b', linestyle=linestyle, linewidth=linewidth)[0])
+        handles.append(plt.plot(B_list, spectrum_odd, 'orange', linestyle=linestyle, linewidth=linewidth)[0])
 plt.xlabel('$B$', fontsize='40', fontname='Times New Roman')#, fontweight='bold')
 plt.ylabel('Energy', fontsize='40', fontname='Times New Roman')#, fontweight='bold')
 plt.tick_params(axis='both', which='major', labelsize=30)
