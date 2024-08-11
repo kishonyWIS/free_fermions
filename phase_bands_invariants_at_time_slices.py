@@ -156,7 +156,7 @@ azim = 125
 ax.view_init(elev=elev, azim=azim, vertical_axis='y')  # for ky=0, elev=10., azim=108, ky=pi, elev=12., azim=105
 ax.set_proj_type('persp', focal_length=0.5)
 ax.set_xticks([0, np.pi])
-ax.set_xticklabels([0, '$\pi/a$'])
+ax.set_xticklabels([0, '$\pi/a_0$'])
 ax.set_yticks([0, 2 * np.pi / 3, 2 * np.pi * 2 / 3, 2 * np.pi])
 ax.set_yticklabels(['$0$', '$\\frac{1}{3}$', '$\\frac{2}{3}$', '$1$'])
 ax.set_zticks([0, 1 / 3, 2 / 3, 1])
@@ -291,7 +291,7 @@ if mode == 'manual' or mode == 'both':
         ),
         xaxis=dict(
             tickvals=[0, np.pi],
-            ticktext=['0', 'π/a'],
+            ticktext=['0', 'π/a₀'],
             tickfont=dict(size=20)
         ),
         yaxis=dict(
