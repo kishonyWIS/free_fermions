@@ -200,8 +200,12 @@ def draw_lattice(system_shape, shading=None, hamiltonian:MajoranaFreeFermionHami
             delay = delay % 1
             if color_bonds_by == 'xyz':
                 color = colormap(xyz_to_delay[name[1]])#xyz_to_color[name[1]]
-            if color_bonds_by == 'delay':
+            elif color_bonds_by == 'delay':
                 color = colormap(delay)
+            elif color_bonds_by == None:
+                color = 'black'
+            else:
+                raise ValueError('color_bonds_by must be None, xyz or delay')
             plt.plot([x1_at_circle_edge, x2_at_circle_edge], [y1_at_circle_edge, y2_at_circle_edge], color=color, linewidth=0.08, zorder=0)
     if color_bonds_by == 'delay' and add_colorbar==True:
         edit_graph(None, None, ax=ax, colorbar_title='Pulse Delay', colormap=colormap,
@@ -307,6 +311,12 @@ if __name__ == "__main__":
         distance_from_vortex[i] = get_average_distance_of_state_from_vortex(hamiltonian.system_shape, states[:, i], vortex_center)
     draw_spectrum(energies, distance_from_vortex)
     plt.savefig(f'graphs/time_vortex/spectrum_Nx_{num_sites_x}_Ny_{num_sites_y}_J_{J:.2f}_pulse_length_{pulse_length:.2f}.pdf', bbox_inches='tight')
+    plt.show()
+
+    # draw the lattice with bonds colored black
+    draw_lattice(hamiltonian.system_shape, hamiltonian=hamiltonian, location_dependent_delay=None, color_bonds_by=None, circle_radius=0.1)
+    plt.savefig(
+        f'graphs/time_vortex/lattice_black_bonds_Nx_{num_sites_x}_Ny_{num_sites_y}.pdf')
     plt.show()
 
     # draw the lattice with the xyz

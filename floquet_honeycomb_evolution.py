@@ -11,6 +11,8 @@ SIGMA_Z = np.array([[1,0],[0,-1]])
 def get_pauli_exponent(strength, unit_vector):
     # calculate the exponential of a linear combination of Pauli matrices with coefficients given by the components of unit_vector
     # exp(-i strength (unit_vector[0] * SIGMA_X + unit_vector[1] * SIGMA_Y + unit_vector[2] * SIGMA_Z))
+    if strength == 0:
+        return np.eye(2)
     return np.cos(strength) * np.eye(2) - 1j * np.sin(strength) * (unit_vector[0] * SIGMA_X + unit_vector[1] * SIGMA_Y + unit_vector[2] * SIGMA_Z)
 
 
@@ -111,14 +113,14 @@ def get_pulse_parameters(kx,ky,theta,t,pulse_length,i_pulse,J=3*np.pi/2):
             return [J,J], [0,start_time], [end_time, t], [unit_vector, unit_vector]
 
 
-def get_unitary_evolution_pulses_with_overlaps_and_delays(kx,ky,theta,t,pulse_length):
+def get_unitary_evolution_pulses_with_overlaps_and_delays(kx,ky,theta,t,pulse_length,J_factor=1.):
     pulse_strengths = []
     pulse_start_points = []
     pulse_end_points = []
     pulse_unit_vectors = []
     for i_pulse in range(3):
         new_pulse_strengths, new_pulse_start_points, new_pulse_end_points, new_pulse_unit_vectors = \
-            get_pulse_parameters(kx, ky, theta, t, pulse_length, i_pulse)
+            get_pulse_parameters(kx, ky, theta, t, pulse_length, i_pulse, J=3*np.pi/2*J_factor)
         pulse_strengths.extend(new_pulse_strengths)
         pulse_start_points.extend(new_pulse_start_points)
         pulse_end_points.extend(new_pulse_end_points)
@@ -135,9 +137,9 @@ def get_unitary_evolution_pulses_with_overlaps_and_delays(kx,ky,theta,t,pulse_le
     return get_unitary_evolution_pulses_with_overlaps(pulse_strengths,pulse_start_points,pulse_end_points,pulse_unit_vectors)
 
 
-def diagonalize_unitary_at_k_theta_time(kx, ky, theta, time, pulse_length=1 / 3):
+def diagonalize_unitary_at_k_theta_time(kx, ky, theta, time, pulse_length=1 / 3, J_factor=1.):
     # unitary = get_unitary_evolution(kx, ky, theta, time, constant_sigma_y=0., J_factor=1.)
-    unitary = get_unitary_evolution_pulses_with_overlaps_and_delays(kx, ky, theta, time, pulse_length=pulse_length)
+    unitary = get_unitary_evolution_pulses_with_overlaps_and_delays(kx, ky, theta, time, pulse_length=pulse_length, J_factor=J_factor)
     phases, states = eig(unitary)
     # sort the eigenvalues and eigenvectors by the phase of the eigenvalues
     angles = np.angle(phases).astype(float)

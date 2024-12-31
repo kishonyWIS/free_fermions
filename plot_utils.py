@@ -40,10 +40,10 @@ def edit_graph(xlabel=None, ylabel=None, ax=None, title=None, legend_title=None,
                ylabelpad=None, colorbar_xticklabels=None, colorbar_yticklabels=None,
                xticks=None, yticks=None, xticklabels=None, yticklabels=None,
                scale=1.0):
-    set_latex_params(scale)
 
     if ax is None:
         ax = plt.gca()  # Get current axis if not provided
+    set_latex_params(scale)
 
     # Apply labels and title if specified
     if xlabel is not None:
@@ -63,7 +63,7 @@ def edit_graph(xlabel=None, ylabel=None, ax=None, title=None, legend_title=None,
         ax.set_xticklabels(xticklabels)
     if yticklabels is not None:
         ax.set_yticklabels(yticklabels)
-    plt.tick_params(axis='both', which='major', labelsize=10 * scale)
+    ax.tick_params(axis='both', which='major', labelsize=10 * scale)
 
     # Apply colormap if specified
     if colormap is not None:
