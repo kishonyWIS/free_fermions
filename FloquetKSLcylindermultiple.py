@@ -3,6 +3,8 @@ from scipy.linalg import expm
 from scipy.linalg import eig
 from matplotlib import pyplot as plt
 import matplotlib as mpl
+from matplotlib.collections import LineCollection
+
 from plot_utils import edit_graph
 from plot_utils import *
 from matplotlib.colors import LinearSegmentedColormap
@@ -11,7 +13,7 @@ from tqdm import tqdm
 mpl.use('TkAgg')  # Or 'Qt5Agg' if you have PyQt5 installed
 set_latex_params()
 
-J_factor_list = [0.5,1.001,1.5,1.85,1.9,1.5]
+J_factor_list = [0.5,1.0001,1.5,1.85,1.9,1.5]
 pulse_length_list = [0.2,0.2,0.2,0.42,0.63,0.75]
 
 # make a 2 by 3 grid of plots
@@ -82,33 +84,68 @@ for J_factor, pulse_length, ax in tqdm(zip(J_factor_list, pulse_length_list, axs
 
     colormap = truncate_colormap(plt.get_cmap('jet'), 0.2, 0.8)
 
+    # Initialize data storage
+    all_kx = []
+    all_energies = []
+    all_colors = []
 
+    # Iterate over kx values
     for kx in kx_list:
         pulse_hamiltonians = {
             'x': get_Jx_hamiltonian(J, num_sites_y, kx),
             'y': get_Jy_hamiltonian(J, num_sites_y, kx),
             'z': get_Jz_hamiltonian(J, num_sites_y, kx)
         }
-        # calculate the unitary for the full cycle
-        unitary = np.eye(2*num_sites_y, dtype=complex)
-        for i_time in range(len(all_times_sorted)-1):
-            delta_t = all_times_sorted[i_time+1] - all_times_sorted[i_time]
+        # Calculate the unitary for the full cycle
+        unitary = np.eye(2 * num_sites_y, dtype=complex)
+        for i_time in range(len(all_times_sorted) - 1):
+            delta_t = all_times_sorted[i_time + 1] - all_times_sorted[i_time]
             active_pulses_i = active_pulses[i_time]
             if len(active_pulses_i) == 0:
                 continue
             hamiltonian = sum([pulse_hamiltonians[pulse] for pulse in active_pulses_i])
-            unitary = expm(-1j*delta_t*hamiltonian) @ unitary
+            unitary = expm(-1j * delta_t * hamiltonian) @ unitary
         phases, states = eig(unitary)
         energies = np.angle(phases)
-        # sort the energies and phases and states according to the energies
+
+        # Sort the energies and states according to the energies
         sort_indices = np.argsort(energies)
         energies = energies[sort_indices]
-        states = states[:,sort_indices]
-        # colors according to the mean location of the states in the y direction
+        states = states[:, sort_indices]
 
-        colors = np.sum(np.abs(states)**2 * Y, axis=0)
-        colors = colors/np.max(Y)
-        ax.scatter(kx*np.ones_like(energies), energies, color=colormap(colors), s=marker_size)
+        # Colors according to the mean location of the states in the y direction
+        colors = np.sum(np.abs(states) ** 2 * Y, axis=0)
+        colors = colors / np.max(Y)
+
+        # Store data for plotting
+        all_kx.append(kx * np.ones_like(energies))
+        all_energies.append(energies)
+        all_colors.append(colors)
+
+    # Convert lists to arrays for easier manipulation
+    all_kx = np.array(all_kx)
+    all_energies = np.array(all_energies)
+    all_colors = np.array(all_colors)
+
+    # Create line segments and assign colors to each segment
+    segments = []
+    segment_colors = []
+    for i in range(all_energies.shape[1]):  # Loop over energy levels
+        for j in range(len(kx_list) - 1):  # Loop over segments along kx
+            x_start, x_end = all_kx[j, i], all_kx[j + 1, i]
+            y_start, y_end = all_energies[j, i], all_energies[j + 1, i]
+            segments.append([(x_start, y_start), (x_end, y_end)])
+            segment_colors.append(all_colors[j, i])  # Assign color to each segment
+
+    # Use LineCollection to plot the lines with segment-wise colors
+    line_collection = LineCollection(
+        segments,
+        cmap=colormap,
+        norm=plt.Normalize(vmin=0, vmax=1),
+        linewidths=3
+    )
+    line_collection.set_array(np.array(segment_colors))
+    ax.add_collection(line_collection)
 
     # # increase fontsize
     # plt.xticks(fontname='Times New Roman', fontsize=30)
