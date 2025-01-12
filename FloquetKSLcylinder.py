@@ -8,6 +8,8 @@ from plot_utils import edit_graph
 from plot_utils import *
 from matplotlib.colors import LinearSegmentedColormap
 set_latex_params()
+sns.set_style("whitegrid")
+
 
 J = np.pi / 4 * 0.9
 pulse_length = 1/2

@@ -3,9 +3,10 @@ from matplotlib import pyplot as plt
 from floquet_honeycomb_evolution import diagonalize_unitary_at_k_theta_time
 import matplotlib
 from tqdm import tqdm
+from plot_utils import edit_graph
 from skimage.morphology import skeletonize
 from scipy.ndimage import gaussian_filter, sobel
-from plot_utils import edit_graph
+import seaborn as sns
 
 matplotlib.use('MacOSX')  # Or 'Qt5Agg' if you have PyQt5 installed
 
@@ -95,56 +96,57 @@ y_tick_labels = ['0', '$\pi/4$', '$\pi/2$']
 scale = 2
 
 for name, quasienergy_singularities in zip(['0', 'pi', 'both'],[topological_singularities_0, topological_singularities_pi, topological_singularities_both]):
-    fig, ax = plt.subplots()
-    plt.pcolor(PULSE_LENGTH, PULSE_INTEGRAL_FACTOR*np.pi/4, np.log10(quasienergy_singularities))
-    plt.colorbar()
-    edit_graph('$\Delta t$', '$\mathcal{J}_0^a \Delta t$', ax=ax, scale=scale, xticks=x_ticks, yticks=y_ticks, xticklabels=x_tick_labels, yticklabels=y_tick_labels)
+    # fig, ax = plt.subplots()
+    # plt.pcolor(PULSE_LENGTH, PULSE_INTEGRAL_FACTOR*np.pi/4, np.log10(quasienergy_singularities))
+    # plt.colorbar()
+    # edit_graph('$\Delta t$', '$\mathcal{J}_0^a \Delta t$', ax=ax, scale=scale, xticks=x_ticks, yticks=y_ticks, xticklabels=x_tick_labels, yticklabels=y_tick_labels)
 
-    threshold = 0.1  # Replace with your desired threshold
-    smoothed_data = quasienergy_singularities#gaussian_filter(topological_singularities_pi, sigma=1)
-    binary_mask = smoothed_data < threshold
-    skeleton = skeletonize(binary_mask)
-    skeleton_x, skeleton_y = np.where(skeleton)
-    plt.scatter(PULSE_LENGTH[skeleton_x, skeleton_y], (PULSE_INTEGRAL_FACTOR*np.pi/4)[skeleton_x, skeleton_y], color='red', s=2, label="Skeleton")
-    plt.xlim([0, 1])
-    plt.ylim([0, np.pi/2])
-    plt.savefig(f'graphs/time_vortex/phase_diagram_quasienergy_{name}_with_gap.pdf')
+    # threshold = 0.1  # Replace with your desired threshold
+    # smoothed_data = quasienergy_singularities#gaussian_filter(topological_singularities_pi, sigma=1)
+    # binary_mask = smoothed_data < threshold
+    # skeleton = skeletonize(binary_mask)
+    # skeleton_x, skeleton_y = np.where(skeleton)
+    # plt.scatter(PULSE_LENGTH[skeleton_x, skeleton_y], (PULSE_INTEGRAL_FACTOR*np.pi/4)[skeleton_x, skeleton_y], color='red', s=2, label="Skeleton")
+    # plt.xlim([0, 1])
+    # plt.ylim([0, np.pi/2])
+    # plt.savefig(f'graphs/time_vortex/phase_diagram_quasienergy_{name}_with_gap.pdf')
 
     # make another plot without the pcolor, only the skeleton
-    fig, ax = plt.subplots()
-    plt.scatter(PULSE_LENGTH[skeleton_x, skeleton_y], (PULSE_INTEGRAL_FACTOR*np.pi/4)[skeleton_x, skeleton_y], color='red', s=2, label="Skeleton")
-    for J_factor, pulse_length in zip(J_factor_list, pulse_length_list):
-        plt.scatter(pulse_length, J_factor*np.pi/4, color='red', s=10)
-    # set axis limits
-    plt.xlim([0, 1])
-    plt.ylim([0, np.pi/2])
-    edit_graph('$\Delta t$', '$\mathcal{J}_0^a \Delta t$', ax=ax, scale=scale, xticks=x_ticks, yticks=y_ticks, xticklabels=x_tick_labels, yticklabels=y_tick_labels)
-    plt.savefig(f'graphs/time_vortex/phase_diagram_quasienergy_{name}.pdf')
+    # fig, ax = plt.subplots()
+    # plt.scatter(PULSE_LENGTH[skeleton_x, skeleton_y], (PULSE_INTEGRAL_FACTOR*np.pi/4)[skeleton_x, skeleton_y], color='red', s=2, label="Skeleton")
+    # for J_factor, pulse_length in zip(J_factor_list, pulse_length_list):
+    #     plt.scatter(pulse_length, J_factor*np.pi/4, color='red', s=10)
+    # # set axis limits
+    # plt.xlim([0, 1])
+    # plt.ylim([0, np.pi/2])
+    # edit_graph('$\Delta t$', '$\mathcal{J}_0^a \Delta t$', ax=ax, scale=scale, xticks=x_ticks, yticks=y_ticks, xticklabels=x_tick_labels, yticklabels=y_tick_labels)
+    # plt.savefig(f'graphs/time_vortex/phase_diagram_quasienergy_{name}.pdf')
 
     # Detect saddle points
     saddle_mask = detect_saddle_points(-np.log10(quasienergy_singularities))
-    plt.pcolor(PULSE_LENGTH, PULSE_INTEGRAL_FACTOR*np.pi/4, np.log10(quasienergy_singularities))
     saddle_x, saddle_y = np.where(saddle_mask)
-    for J_factor, pulse_length in zip(J_factor_list, pulse_length_list):
-        plt.scatter(pulse_length, J_factor*np.pi/4, color='red', s=10)
-    plt.scatter(PULSE_LENGTH[saddle_x, saddle_y], (PULSE_INTEGRAL_FACTOR*np.pi/4)[saddle_x, saddle_y], color='blue', s=2, label="Saddle points")
+    # plt.pcolor(PULSE_LENGTH, PULSE_INTEGRAL_FACTOR * np.pi / 4, np.log10(quasienergy_singularities))
+    # for J_factor, pulse_length in zip(J_factor_list, pulse_length_list):
+    #     plt.scatter(pulse_length, J_factor*np.pi/4, color='red', s=10)
+    # plt.scatter(PULSE_LENGTH[saddle_x, saddle_y], (PULSE_INTEGRAL_FACTOR*np.pi/4)[saddle_x, saddle_y], color='blue', s=2, label="Saddle points")
 
     # draw only the saddle mask as an image
-    plt.figure()
+    fig, ax = plt.subplots()
     # make black and white
     plt.pcolor(PULSE_LENGTH, PULSE_INTEGRAL_FACTOR*np.pi/4, np.logical_not(saddle_mask), cmap='gray')
     for J_factor, pulse_length in zip(J_factor_list, pulse_length_list):
         plt.scatter(pulse_length, J_factor*np.pi/4, color='red', s=10)
+    from matplotlib.patches import Rectangle
     edit_graph('$\Delta t$', '$\mathcal{J}_0^a \Delta t$', scale=scale, xticks=x_ticks, yticks=y_ticks, xticklabels=x_tick_labels, yticklabels=y_tick_labels)
     plt.savefig(f'graphs/time_vortex/phase_diagram_quasienergy_{name}_saddle_points.pdf')
 
     # do the same with imshow
-    plt.figure()
-    plt.imshow(np.logical_not(saddle_mask.T), cmap='gray', origin='lower', aspect='auto', extent=[0, 1, 0, np.pi/2])
-    for J_factor, pulse_length in zip(J_factor_list, pulse_length_list):
-        plt.scatter(pulse_length, J_factor*np.pi/4, color='red', s=10)
-    edit_graph('$\Delta t$', '$\mathcal{J}_0^a \Delta t$', scale=scale, xticks=x_ticks, yticks=y_ticks, xticklabels=x_tick_labels, yticklabels=y_tick_labels)
-    plt.savefig(f'graphs/time_vortex/phase_diagram_quasienergy_{name}_saddle_points_imshow.pdf')
+    # plt.figure()
+    # plt.imshow(np.logical_not(saddle_mask.T), cmap='gray', origin='lower', aspect='auto', extent=[0, 1, 0, np.pi/2])
+    # for J_factor, pulse_length in zip(J_factor_list, pulse_length_list):
+    #     plt.scatter(pulse_length, J_factor*np.pi/4, color='red', s=10)
+    # edit_graph('$\Delta t$', '$\mathcal{J}_0^a \Delta t$', scale=scale, xticks=x_ticks, yticks=y_ticks, xticklabels=x_tick_labels, yticklabels=y_tick_labels)
+    # plt.savefig(f'graphs/time_vortex/phase_diagram_quasienergy_{name}_saddle_points_imshow.pdf')
 
 
 plt.show()

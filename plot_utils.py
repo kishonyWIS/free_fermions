@@ -3,7 +3,6 @@ import seaborn as sns
 import numpy as np
 
 # Configure Seaborn style
-sns.set(style="whitegrid")
 
 def set_latex_params(scale=1.0):
     plt.rc('text', usetex=True)
