@@ -12,7 +12,7 @@ from tqdm import tqdm
 
 mpl.use('TkAgg')  # Or 'Qt5Agg' if you have PyQt5 installed
 set_latex_params()
-sns.set_style("whitegrid")
+# sns.set_style("whitegrid")
 
 J_factor_list = [0.5,1.0001,1.5,1.85,1.9,1.5]
 pulse_length_list = [0.2,0.2,0.2,0.42,0.63,0.75]
