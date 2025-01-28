@@ -48,7 +48,7 @@ with sns.axes_style("whitegrid"):
             group = group.iloc[:int(len(group)*accepted_fraction)]
             errors_per_cycle_per_qubit_list.append(group_name)
             energy_density_list.append(np.average(group.energy_density))
-            energy_density_std_list.append(np.std(group.energy_density)/np.sqrt(len(group.energy_density)/(cooling_half_life/np.log(2))))
+            energy_density_std_list.append(np.std(group.energy_density)/np.sqrt(len(group.energy_density)/(2*cooling_half_life/np.log(2))))
         plt.errorbar(errors_per_cycle_per_qubit_list, energy_density_list, yerr=energy_density_std_list, linestyle='None', marker=marker, color=color, label=f'{accepted_fraction}')
         b, a = np.polyfit(errors_per_cycle_per_qubit_list, energy_density_list, deg=1)
         xseq = np.linspace(0, max(errors_per_cycle_per_qubit_list), num=2)
@@ -56,7 +56,7 @@ with sns.axes_style("whitegrid"):
     # plt.xscale('log')
     # plt.yscale('log')
     plt.xlabel('Errors per cycle per qubit', fontsize=str(20), fontname='Times New Roman')#, fontweight='bold')
-    plt.ylabel('$\\varepsilon_s$', fontsize=str(24), fontname='Times New Roman')#, fontweight='bold')\mathrm{steady}
+    plt.ylabel('$\\varepsilon_\\text{s}$', fontsize=str(24), fontname='Times New Roman')#, fontweight='bold')\mathrm{steady}
     plt.tick_params(axis='both', which='major', labelsize=15)
     plt.gca().set_ylim(bottom=0.)
     leg = plt.legend(prop=mpl.font_manager.FontProperties(family='Times New Roman', size=15), ncol=2)
