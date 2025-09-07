@@ -46,10 +46,23 @@ def get_KSL_model(f, Delta, g, B, initial_state='random', num_cooling_sublattice
     if num_cooling_sublattices == 1:
         g_strengthB = 0
 
-    hamiltonian.add_term(name='g_A', strength=4*g_strengthA, sublattice1=0, sublattice2=2, site_offset=(0,), time_dependence=g)
-    hamiltonian.add_term(name='g_B', strength=4*g_strengthB, sublattice1=1, sublattice2=3, site_offset=(0,), time_dependence=g)
-    hamiltonian.add_term(name='B_A', strength=4j, sublattice1=2, sublattice2=4, site_offset=(0,), time_dependence=B)
-    hamiltonian.add_term(name='B_B', strength=4j, sublattice1=3, sublattice2=5, site_offset=(0,), time_dependence=B)
+    # Handle g parameter - can be callable or constant
+    if callable(g):
+        hamiltonian.add_term(name='g_A', strength=4*g_strengthA, sublattice1=0, sublattice2=2, site_offset=(0,), time_dependence=g)
+        hamiltonian.add_term(name='g_B', strength=4*g_strengthB, sublattice1=1, sublattice2=3, site_offset=(0,), time_dependence=g)
+    else:
+        # g is a constant value
+        hamiltonian.add_term(name='g_A', strength=4*g_strengthA*g, sublattice1=0, sublattice2=2, site_offset=(0,))
+        hamiltonian.add_term(name='g_B', strength=4*g_strengthB*g, sublattice1=1, sublattice2=3, site_offset=(0,))
+    
+    # Handle B parameter - can be callable or constant
+    if callable(B):
+        hamiltonian.add_term(name='B_A', strength=4j, sublattice1=2, sublattice2=4, site_offset=(0,), time_dependence=B)
+        hamiltonian.add_term(name='B_B', strength=4j, sublattice1=3, sublattice2=5, site_offset=(0,), time_dependence=B)
+    else:
+        # B is a constant value
+        hamiltonian.add_term(name='B_A', strength=4j*B, sublattice1=2, sublattice2=4, site_offset=(0,))
+        hamiltonian.add_term(name='B_B', strength=4j*B, sublattice1=3, sublattice2=5, site_offset=(0,))
 
     if initial_state == 'random':
         S = TranslationInvariantKSLState(system_shape)
