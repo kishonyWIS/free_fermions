@@ -18,7 +18,7 @@ Jz = 1.
 
 # Variational circuit parameters
 T = 50
-p = 400  # Number of layers in the variational circuit
+p = 4  # Number of layers in the variational circuit
 n_k_points = 1 + 6*1
 
 integration_params = dict(name='vode', nsteps=6000, rtol=1e-6, atol=1e-10)
@@ -38,7 +38,6 @@ def get_chern_number_from_single_particle_dm(single_particle_dm):
 
 def get_individual_hamiltonian_terms(kx, ky, t):
     """Get individual Hamiltonian term matrices using get_KSL_model for consistency"""
-    f = get_f(kx, ky, Jx, Jy, Jz)
     Delta = get_Delta(kx, ky, kappa)
     g_t = smoothed_g(t)
     B_t = smoothed_B(t)
@@ -176,19 +175,157 @@ def single_cooling_cycle_variational(kx, ky, strength_durations):
     
     return S, E_diff, E_gs
 
-def main():
-    """Main function to run the variational circuit simulation"""
-    print("Starting variational circuit simulation...")
+def strength_durations_to_vector(strength_durations):
+    """Convert strength_durations dictionary to a flat vector for optimization"""
+    vector = []
+    for term in ['Jx', 'Jy', 'Jz', 'kappa', 'g', 'B']:
+        vector.extend(strength_durations[term])
+    return np.array(vector)
+
+def vector_to_strength_durations(vector):
+    """Convert flat vector back to strength_durations dictionary"""
+    strength_durations = {}
+    start_idx = 0
+    for term in ['Jx', 'Jy', 'Jz', 'kappa', 'g', 'B']:
+        end_idx = start_idx + p
+        strength_durations[term] = vector[start_idx:end_idx]
+        start_idx = end_idx
+    return strength_durations
+
+def objective_function(vector, kx_list, ky_list):
+    """
+    Objective function to minimize: energy density
+    """
+    # Convert vector back to strength_durations
+    strength_durations = vector_to_strength_durations(vector)
     
-    # Create momentum space grid
+    # Initialize energy difference array
+    E_diff = np.zeros((len(kx_list), len(ky_list)))
+    
+    # Loop over momentum space
+    for i_kx, kx in enumerate(kx_list):
+        for i_ky, ky in enumerate(ky_list):
+            # Perform single cooling cycle
+            S, E_diff_val, E_gs = single_cooling_cycle_variational(kx, ky, strength_durations)
+            E_diff[i_kx, i_ky] = E_diff_val
+    
+    # Calculate average energy density
+    energy_density = np.nanmean(E_diff) / 2  # Divide by 2 because we count k and -k together
+    
+    return energy_density
+
+def optimize_strength_durations(kx_list, ky_list, initial_strength_durations=None, method='L-BFGS-B'):
+    """
+    Optimize strength_durations to minimize energy density
+    
+    Args:
+        kx_list, ky_list: momentum space grid
+        initial_strength_durations: initial guess (if None, uses trotterized evolution)
+        method: optimization method ('L-BFGS-B', 'SLSQP', etc.)
+    
+    Returns:
+        optimized_strength_durations: dictionary with optimized parameters
+        optimization_result: scipy optimization result
+    """
+    print("Starting optimization...")
+    
+    # Get initial guess
+    if initial_strength_durations is None:
+        initial_strength_durations = trotterized_evolution_parameters()
+    
+    # Convert to vector
+    initial_vector = strength_durations_to_vector(initial_strength_durations)
+    
+    # Set bounds: allow both positive and negative values for flexibility
+    # but keep them reasonable (e.g., -10 to 10)
+    bounds = [(-10.0, 10.0)] * len(initial_vector)
+    
+    print(f"Optimizing {len(initial_vector)} parameters using {method}")
+    print(f"Initial energy density: {objective_function(initial_vector, kx_list, ky_list):.6f}")
+    
+    # Perform optimization
+    result = minimize(
+        objective_function,
+        initial_vector,
+        args=(kx_list, ky_list),
+        method=method,
+        bounds=bounds,
+        options={'maxiter': 100, 'disp': True}
+    )
+    
+    # Convert result back to strength_durations
+    optimized_strength_durations = vector_to_strength_durations(result.x)
+    
+    print(f"Optimization completed!")
+    print(f"Final energy density: {result.fun:.6f}")
+    print(f"Success: {result.success}")
+    print(f"Iterations: {result.nit}")
+    
+    return optimized_strength_durations, result
+
+def load_optimized_parameters(filename='optimized_strength_durations.npz'):
+    """Load previously optimized parameters from file"""
+    data = np.load(filename)
+    strength_durations = {}
+    for term in ['Jx', 'Jy', 'Jz', 'kappa', 'g', 'B']:
+        strength_durations[term] = data[term]
+    print(f"Loaded optimized parameters from {filename}")
+    return strength_durations
+
+def test_optimization_small_grid():
+    """Test optimization with a very small grid for quick testing"""
+    print("Testing optimization with small grid...")
+    
+    # Use a very small grid for testing
+    kx_list = np.linspace(-np.pi, np.pi, 3)  # Only 3 points
+    ky_list = np.linspace(-np.pi, np.pi, 3)  # Only 3 points
+    
+    print(f"Test grid: {len(kx_list)}x{len(ky_list)} = {len(kx_list)*len(ky_list)} points")
+    
+    # Get initial parameters
+    initial_strength_durations = trotterized_evolution_parameters()
+    
+    # Test objective function with initial parameters
+    initial_energy = objective_function(
+        strength_durations_to_vector(initial_strength_durations), 
+        kx_list, ky_list
+    )
+    print(f"Initial energy density: {initial_energy:.6f}")
+    
+    # Run optimization
+    optimized_strength_durations, opt_result = optimize_strength_durations(
+        kx_list, ky_list, 
+        initial_strength_durations=initial_strength_durations,
+        method='L-BFGS-B'
+    )
+    
+    print(f"Test completed! Final energy: {opt_result.fun:.6f}")
+    return optimized_strength_durations, opt_result
+
+def main():
+    """Main function to run the variational circuit simulation with optimization"""
+    print("Starting variational circuit simulation with optimization...")
+    
+    # Create momentum space grid - start with a small grid for testing
     kx_list = np.linspace(-np.pi, np.pi, n_k_points)
     ky_list = np.linspace(-np.pi, np.pi, n_k_points)
     
-    # Get trotterized evolution parameters
-    strength_durations = trotterized_evolution_parameters()
-    
     print(f"Using {p} layers for variational circuit")
-    print(f"Strength*duration parameters shape: {[(k, v.shape) for k, v in strength_durations.items()]}")
+    print(f"Momentum grid: {len(kx_list)}x{len(ky_list)} = {len(kx_list)*len(ky_list)} points")
+    
+    # Get initial trotterized evolution parameters
+    initial_strength_durations = trotterized_evolution_parameters()
+    print(f"Initial strength*duration parameters shape: {[(k, v.shape) for k, v in initial_strength_durations.items()]}")
+    
+    # Optimize the strength_durations
+    optimized_strength_durations, opt_result = optimize_strength_durations(
+        kx_list, ky_list, 
+        initial_strength_durations=initial_strength_durations,
+        method='L-BFGS-B'
+    )
+    
+    # Now run the full simulation with optimized parameters
+    print("\nRunning full simulation with optimized parameters...")
     
     # Initialize arrays for results
     E_diff = np.zeros((len(kx_list), len(ky_list)))
@@ -198,18 +335,12 @@ def main():
     for i_kx, kx in enumerate(kx_list):
         print(f'Processing kx={kx:.3f} ({i_kx+1}/{len(kx_list)})')
         for i_ky, ky in enumerate(ky_list):
-            try:
-                # Perform single cooling cycle
-                S, E_diff_val, E_gs = single_cooling_cycle_variational(kx, ky, strength_durations)
-                
-                # Store results
-                E_diff[i_kx, i_ky] = E_diff_val
-                single_particle_dm[i_kx, i_ky, :, :] = S.matrix
-                
-            except Exception as e:
-                print(f"Error at kx={kx}, ky={ky}: {e}")
-                E_diff[i_kx, i_ky] = np.nan
-                single_particle_dm[i_kx, i_ky, :, :] = np.nan
+            # Perform single cooling cycle with optimized parameters
+            S, E_diff_val, E_gs = single_cooling_cycle_variational(kx, ky, optimized_strength_durations)
+            
+            # Store results
+            E_diff[i_kx, i_ky] = E_diff_val
+            single_particle_dm[i_kx, i_ky, :, :] = S.matrix
     
     # Calculate Chern numbers
     total_chern_number = get_chern_number_from_single_particle_dm(single_particle_dm)
@@ -219,16 +350,48 @@ def main():
     # Calculate average energy density
     energy_density = np.nanmean(E_diff) / 2  # Divide by 2 because we count k and -k together
 
-    plt.figure()
-    plt.imshow(E_diff)
-    plt.colorbar()
+    # Plot results
+    plt.figure(figsize=(12, 5))
+    
+    plt.subplot(1, 2, 1)
+    plt.imshow(E_diff, extent=[-np.pi, np.pi, -np.pi, np.pi], origin='lower')
+    plt.colorbar(label='Energy difference')
+    plt.xlabel('kx')
+    plt.ylabel('ky')
+    plt.title('Energy difference after optimization')
+    
+    plt.subplot(1, 2, 2)
+    # Plot the optimized strength_durations for visualization
+    terms = ['Jx', 'Jy', 'Jz', 'kappa', 'g', 'B']
+    for i, term in enumerate(terms):
+        plt.plot(optimized_strength_durations[term], label=term, marker='o')
+    plt.xlabel('Layer')
+    plt.ylabel('Strength*duration')
+    plt.title('Optimized strength*duration parameters')
+    plt.legend()
+    plt.grid(True)
+    
+    plt.tight_layout()
     plt.show()
     
-    print(f"\nResults:")
+    print(f"\nFinal Results:")
     print(f"Energy density: {energy_density:.6f}")
     print(f"Total Chern number: {total_chern_number:.6f}")
     print(f"System Chern number: {system_chern_number:.6f}")
     print(f"Bath Chern number: {bath_chern_number:.6f}")
+    print(f"Optimization success: {opt_result.success}")
+    print(f"Optimization iterations: {opt_result.nit}")
+    
+    # Save optimized parameters
+    np.savez('optimized_strength_durations.npz', **optimized_strength_durations)
+    print("Optimized parameters saved to 'optimized_strength_durations.npz'")
     
 if __name__ == "__main__":
-    main()
+    import sys
+    
+    if len(sys.argv) > 1 and sys.argv[1] == "test":
+        # Run test with small grid
+        test_optimization_small_grid()
+    else:
+        # Run full optimization
+        main()
