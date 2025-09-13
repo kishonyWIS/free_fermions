@@ -27,6 +27,10 @@ p = 10  # Number of layers in the variational circuit
 n_k_points_train = 1 + 6*1  # Training grid size
 n_k_points_test = 1 + 6*3   # Testing grid size
 
+# Cooling cycle parameters
+n_cycles_train = 5    # Number of cooling cycles for training
+n_cycles_test = 10     # Number of cooling cycles for testing
+
 smoothed_g = lambda tt: get_g(tt, g0, T, T/4) #lambda tt: 0#
 smoothed_B = lambda tt: get_B(tt, B0, B1, T) #lambda tt: 0#
 
@@ -151,9 +155,19 @@ def trotterized_evolution_parameters():
     }    
     return strength_durations
 
-def single_cooling_cycle_variational(kx, ky, strength_durations):
+def multiple_cooling_cycles_variational(kx, ky, strength_durations, n_cycles=1):
     """
-    Perform a single cooling cycle using the variational circuit
+    Perform multiple cooling cycles using the variational circuit
+    
+    Args:
+        kx, ky: momentum values
+        strength_durations: circuit parameters
+        n_cycles: number of cooling cycles to perform
+    
+    Returns:
+        S: final state after all cycles
+        E_diff: energy difference after all cycles
+        E_gs: ground state energy
     """
     # Create the variational circuit unitary
     Ud = create_variational_circuit(strength_durations, kx, ky)
@@ -170,14 +184,27 @@ def single_cooling_cycle_variational(kx, ky, strength_durations):
         initial_state='product', num_cooling_sublattices=num_cooling_sublattices
     )
 
-    # Apply the variational circuit
-    S.evolve_with_unitary(Ud)
+    # Perform multiple cooling cycles
+    for cycle in range(n_cycles):
+        # Reset bath qubits before each cycle (except the first one)
+        if cycle > 0:
+            S.reset_all_tau()
+        
+        # Apply the variational circuit
+        S.evolve_with_unitary(Ud)
     
     # Calculate final energy
     E_final = S.get_energy(hamiltonian.get_matrix(T))
     E_diff = E_final - E_gs
     
     return S, E_diff, E_gs
+
+def single_cooling_cycle_variational(kx, ky, strength_durations):
+    """
+    Perform a single cooling cycle using the variational circuit
+    (Backward compatibility wrapper)
+    """
+    return multiple_cooling_cycles_variational(kx, ky, strength_durations, n_cycles=1)
 
 def strength_durations_to_vector(strength_durations):
     """Convert strength_durations dictionary to a flat vector for optimization"""
@@ -196,9 +223,15 @@ def vector_to_strength_durations(vector):
         start_idx = end_idx
     return strength_durations
 
-def objective_function(vector, kx_list, ky_list, verbose=False):
+def objective_function(vector, kx_list, ky_list, n_cycles=1, verbose=False):
     """
     Objective function to minimize: energy density
+    
+    Args:
+        vector: optimization parameters
+        kx_list, ky_list: momentum space grids
+        n_cycles: number of cooling cycles to perform
+        verbose: whether to print progress
     """
     # Convert vector back to strength_durations
     strength_durations = vector_to_strength_durations(vector)
@@ -207,15 +240,15 @@ def objective_function(vector, kx_list, ky_list, verbose=False):
     E_diff = np.zeros((len(kx_list), len(ky_list)))
     
     if verbose:
-        print(f"    Evaluating objective function on {len(kx_list)}x{len(ky_list)} grid...")
+        print(f"    Evaluating objective function on {len(kx_list)}x{len(ky_list)} grid with {n_cycles} cycles...")
     
     # Loop over momentum space
     for i_kx, kx in enumerate(kx_list):
         if verbose and i_kx % 2 == 0:  # Print every other kx for brevity
             print(f"      Processing kx={kx:.3f} ({i_kx+1}/{len(kx_list)})")
         for i_ky, ky in enumerate(ky_list):
-            # Perform single cooling cycle
-            S, E_diff_val, E_gs = single_cooling_cycle_variational(kx, ky, strength_durations)
+            # Perform multiple cooling cycles with given parameters
+            S, E_diff_val, E_gs = multiple_cooling_cycles_variational(kx, ky, strength_durations, n_cycles)
             E_diff[i_kx, i_ky] = E_diff_val
     
     # Calculate average energy density
@@ -226,12 +259,13 @@ def objective_function(vector, kx_list, ky_list, verbose=False):
     
     return energy_density
 
-def optimize_strength_durations(kx_list, ky_list, initial_strength_durations=None, method='L-BFGS-B'):
+def optimize_strength_durations(kx_list, ky_list, n_cycles=1, initial_strength_durations=None, method='L-BFGS-B'):
     """
     Optimize strength_durations to minimize energy density
     
     Args:
         kx_list, ky_list: momentum space grid
+        n_cycles: number of cooling cycles to perform
         initial_strength_durations: initial guess (if None, uses trotterized evolution)
         method: optimization method ('L-BFGS-B', 'SLSQP', etc.)
     
@@ -254,25 +288,49 @@ def optimize_strength_durations(kx_list, ky_list, initial_strength_durations=Non
     bounds = [(-10.0, 10.0)] * len(initial_vector)
     
     print(f"Optimizing {len(initial_vector)} parameters using {method}")
-    print(f"Initial energy density: {objective_function(initial_vector, kx_list, ky_list, verbose=True):.6f}")
+    print(f"Initial energy density: {objective_function(initial_vector, kx_list, ky_list, n_cycles, verbose=True):.6f}")
     
     # Set up optimization options
     options = {'maxiter': 20, 'disp': True, 'ftol': 1e-9, 'gtol': 1e-5}
     max_iter = options['maxiter']
     
-    # Create callback function with access to kx_list, ky_list
-    iteration_count = [0]  # Use list to allow modification in nested function
+    # Create a wrapper class to track function evaluations efficiently
+    class ObjectiveWrapper:
+        def __init__(self, func, kx_list, ky_list, n_cycles):
+            self.func = func
+            self.kx_list = kx_list
+            self.ky_list = ky_list
+            self.n_cycles = n_cycles
+            self.last_x = None
+            self.last_value = None
+            self.eval_count = 0
+            
+        def __call__(self, x):
+            self.eval_count += 1
+            self.last_x = x.copy()
+            self.last_value = self.func(x, self.kx_list, self.ky_list, self.n_cycles, verbose=False)
+            return self.last_value
+    
+    # Create wrapper and callback
+    obj_wrapper = ObjectiveWrapper(objective_function, kx_list, ky_list, n_cycles)
+    iteration_count = [0]
+    
     def callback(xk):
         iteration_count[0] += 1
-        current_energy = objective_function(xk, kx_list, ky_list, verbose=False)
+        # Use the cached value from the wrapper if available
+        if obj_wrapper.last_value is not None and np.allclose(xk, obj_wrapper.last_x):
+            current_energy = obj_wrapper.last_value
+        else:
+            # Fallback: compute if not available (shouldn't happen in normal operation)
+            current_energy = objective_function(xk, kx_list, ky_list, n_cycles, verbose=False)
+            
         print(f"  Iteration {iteration_count[0]}/{max_iter}: Energy density = {current_energy:.6f}")
         return False
     
     # Perform optimization
     result = minimize(
-        objective_function,
+        obj_wrapper,  # Use the wrapper instead of the raw function
         initial_vector,
-        args=(kx_list, ky_list),
         method=method,
         bounds=bounds,
         callback=callback,
@@ -288,6 +346,7 @@ def optimize_strength_durations(kx_list, ky_list, initial_strength_durations=Non
     print(f"Iterations: {result.nit}")
     print(f"Function evaluations: {result.nfev}")
     print(f"Gradient evaluations: {result.njev}")
+    print(f"Total objective function calls: {obj_wrapper.eval_count}")
     
     return optimized_strength_durations, result
 
@@ -408,13 +467,14 @@ def print_results(energy_density, total_chern_number, system_chern_number,
     
     print("="*60)
 
-def run_simulation_on_grid(kx_list, ky_list, strength_durations, grid_name="", plot=True):
+def run_simulation_on_grid(kx_list, ky_list, strength_durations, n_cycles=1, grid_name="", plot=True):
     """
     Run simulation on a given momentum grid
     
     Args:
         kx_list, ky_list: momentum space grids
         strength_durations: circuit parameters
+        n_cycles: number of cooling cycles to perform
         grid_name: name for display purposes
         plot: whether to plot results
     
@@ -432,8 +492,8 @@ def run_simulation_on_grid(kx_list, ky_list, strength_durations, grid_name="", p
     for i_kx, kx in enumerate(kx_list):
         print(f'Processing kx={kx:.3f} ({i_kx+1}/{grid_size})')
         for i_ky, ky in enumerate(ky_list):
-            # Perform single cooling cycle with given parameters
-            S, E_diff_val, E_gs = single_cooling_cycle_variational(kx, ky, strength_durations)
+            # Perform multiple cooling cycles with given parameters
+            S, E_diff_val, E_gs = multiple_cooling_cycles_variational(kx, ky, strength_durations, n_cycles)
             
             # Store results
             E_diff[i_kx, i_ky] = E_diff_val
@@ -473,6 +533,7 @@ def train_variational_circuit():
     # Optimize the strength_durations on training data
     optimized_strength_durations, opt_result = optimize_strength_durations(
         kx_list_train, ky_list_train, 
+        n_cycles=n_cycles_train,
         initial_strength_durations=initial_strength_durations,
         method='L-BFGS-B'
     )
@@ -496,12 +557,73 @@ def test_variational_circuit(optimized_strength_durations):
     ky_list_test = np.linspace(-np.pi, np.pi, n_k_points_test)
     
     # Run simulation using helper function
-    return run_simulation_on_grid(kx_list_test, ky_list_test, optimized_strength_durations, "Testing", plot=False)
+    return run_simulation_on_grid(kx_list_test, ky_list_test, optimized_strength_durations, n_cycles_test, "Testing", plot=False)
+
+def plot_energy_density_vs_cycles(kx_list, ky_list, strength_durations, max_cycles=20):
+    """
+    Plot energy density as a function of the number of cooling cycles
+    
+    Args:
+        kx_list, ky_list: momentum space grids
+        strength_durations: circuit parameters
+        max_cycles: maximum number of cycles to test
+    """
+    print(f"\nAnalyzing energy density vs cycles (up to {max_cycles} cycles)...")
+    
+    # Test different numbers of cycles
+    cycle_counts = range(1, max_cycles + 1)
+    energy_densities = []
+    
+    for n_cycles in cycle_counts:
+        print(f"  Testing {n_cycles} cycles...")
+        
+        # Calculate energy density for this number of cycles
+        E_diff = np.zeros((len(kx_list), len(ky_list)))
+        
+        for i_kx, kx in enumerate(kx_list):
+            for i_ky, ky in enumerate(ky_list):
+                S, E_diff_val, E_gs = multiple_cooling_cycles_variational(kx, ky, strength_durations, n_cycles)
+                E_diff[i_kx, i_ky] = E_diff_val
+        
+        # Calculate average energy density
+        energy_density = np.nanmean(E_diff) / 2  # Divide by 2 because we count k and -k together
+        energy_densities.append(energy_density)
+    
+    # Create the plot
+    plt.figure(figsize=(10, 6))
+    plt.plot(cycle_counts, energy_densities, 'b-o', linewidth=2, markersize=6)
+    plt.xlabel('Number of Cooling Cycles')
+    plt.ylabel('Energy Density')
+    plt.title('Energy Density vs Number of Cooling Cycles (Test Data)')
+    plt.grid(True, alpha=0.3)
+    
+    # Add horizontal line at the final value for reference
+    plt.axhline(y=energy_densities[-1], color='r', linestyle='--', alpha=0.7, 
+                label=f'Final value: {energy_densities[-1]:.6f}')
+    
+    # Add vertical line at the training cycles for reference
+    plt.axvline(x=n_cycles_train, color='g', linestyle=':', alpha=0.7, 
+                label=f'Training cycles: {n_cycles_train}')
+    
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+    
+    # Print some statistics
+    print(f"\nEnergy density statistics:")
+    print(f"  After 1 cycle: {energy_densities[0]:.6f}")
+    print(f"  After {n_cycles_train} cycles (training): {energy_densities[n_cycles_train-1]:.6f}")
+    print(f"  After {max_cycles} cycles (final): {energy_densities[-1]:.6f}")
+    print(f"  Improvement from 1 to {max_cycles} cycles: {energy_densities[0] - energy_densities[-1]:.6f}")
+    
+    return cycle_counts, energy_densities
 
 def main():
     """Main function to run the variational circuit simulation with training and testing"""
     print("Starting variational circuit simulation with training and testing...")
     print(f"Using {p} layers for variational circuit")
+    print(f"Training with {n_cycles_train} cooling cycles")
+    print(f"Testing with {n_cycles_test} cooling cycles")
     
     # Phase 1: Training
     optimized_strength_durations, opt_result = train_variational_circuit()
@@ -509,10 +631,24 @@ def main():
     # Phase 2: Testing
     E_diff, single_particle_dm, total_chern_number, system_chern_number, bath_chern_number, energy_density = test_variational_circuit(optimized_strength_durations)
 
+    # Phase 3: Energy density vs cycles analysis
+    print("\n" + "="*60)
+    print("ENERGY DENSITY VS CYCLES ANALYSIS")
+    print("="*60)
+    
+    # Create testing momentum space grid for the analysis
+    kx_list_test = np.linspace(-np.pi, np.pi, n_k_points_test)
+    ky_list_test = np.linspace(-np.pi, np.pi, n_k_points_test)
+    
+    # Plot energy density vs cycles
+    cycle_counts, energy_densities = plot_energy_density_vs_cycles(
+        kx_list_test, ky_list_test, optimized_strength_durations, max_cycles=20
+    )
+
     # Plot and print results using helper functions
     print_results(energy_density, total_chern_number, system_chern_number, 
                 bath_chern_number, opt_result=opt_result, 
-                grid_size=f"{n_k_points_train}x{n_k_points_train} (train), {n_k_points_test}x{n_k_points_test} (test)", 
+                grid_size=f"{n_k_points_train}x{n_k_points_train} (train, {n_cycles_train} cycles), {n_k_points_test}x{n_k_points_test} (test, {n_cycles_test} cycles)", 
                 phase_name="FINAL RESULTS")
     plot_results(E_diff, optimized_strength_durations, n_k_points_test, "Test ", show_training_points=True)
     
