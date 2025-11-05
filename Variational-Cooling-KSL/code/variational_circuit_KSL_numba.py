@@ -21,7 +21,7 @@ from translational_invariant_KSL import get_KSL_model, get_Delta, get_f
 DATA_DIR = os.path.join(os.path.dirname(__file__), '../data')
 
 # Set random seed for reproducibility
-# np.random.seed(42)
+np.random.seed(42)
 
 # Pauli matrices - defined as constants for Numba
 sigma_x = np.array([[0, 1], [1, 0]], dtype=complex)
@@ -52,6 +52,8 @@ n_cycles_train = 5    # Number of cooling cycles for training
 n_cycles_test = 10     # Number of cooling cycles for testing
 epochs = 1000
 
+
+# ===== Core Circuit Functions (Numba-optimized) =====
 
 @jit(nopython=True, cache=True)
 def pauli_exponentiation_numba(a_n):
@@ -336,9 +338,11 @@ def expand_strength_durations(old_strength_durations, old_p, new_p):
     return new_strength_durations
 
 
-def multiple_cooling_cycles_variational(kx, ky, strength_durations, n_cycles=1):
+# ===== Simulation Functions =====
+
+def simulate_single_kpoint(kx, ky, strength_durations, n_cycles=1):
     """
-    Perform multiple cooling cycles using the variational circuit
+    Simulate variational circuit for a single k-point
     
     Args:
         kx, ky: momentum values
@@ -346,9 +350,10 @@ def multiple_cooling_cycles_variational(kx, ky, strength_durations, n_cycles=1):
         n_cycles: number of cooling cycles to perform
     
     Returns:
-        S: final state after all cycles
-        E_diff: list of energy differences after each cycle
+        final_state: final state after all cycles
+        E_diff_list: list of energy differences after each cycle
         E_gs: ground state energy
+        single_particle_dm: single-particle density matrix (6x6)
     """
     # Create the variational circuit unitary
     Ud = create_variational_circuit(strength_durations, kx, ky)
@@ -382,12 +387,15 @@ def multiple_cooling_cycles_variational(kx, ky, strength_durations, n_cycles=1):
         E_diff = E_final - E_gs
         E_diff_list.append(E_diff)
     
-    return S, E_diff_list, E_gs
+    # Get single-particle density matrix
+    single_particle_dm = S.matrix
+    
+    return S, E_diff_list, E_gs, single_particle_dm
 
 
-def run_simulation_over_momentum_grid(kx_list, ky_list, strength_durations, n_cycles=1, verbose=False):
+def simulate_grid(kx_list, ky_list, strength_durations, n_cycles=1, verbose=False):
     """
-    Helper function to run simulation over a momentum grid and return energy differences
+    Simulate variational circuit over a momentum grid
     
     Args:
         kx_list, ky_list: momentum space grids
@@ -397,7 +405,7 @@ def run_simulation_over_momentum_grid(kx_list, ky_list, strength_durations, n_cy
     
     Returns:
         E_diff: 3D array of energy differences (n_cycles, grid_size_x, grid_size_y) or 2D array if n_cycles=1
-        single_particle_dm: 4D array of single-particle density matrices (optional)
+        single_particle_dm: 4D array of single-particle density matrices
     """
     grid_size_x = len(kx_list)
     grid_size_y = len(ky_list)
@@ -409,13 +417,13 @@ def run_simulation_over_momentum_grid(kx_list, ky_list, strength_durations, n_cy
         if verbose:
             print(f'Processing kx={kx:.3f} ({i_kx+1}/{grid_size_x})')
         for i_ky, ky in enumerate(ky_list):
-            # Perform multiple cooling cycles with given parameters
-            S, E_diff_list, E_gs = multiple_cooling_cycles_variational(kx, ky, strength_durations, n_cycles)
+            # Simulate single k-point
+            _, E_diff_list, _, dm = simulate_single_kpoint(kx, ky, strength_durations, n_cycles)
             
             # Store results for all cycles
             for cycle in range(n_cycles):
                 E_diff[cycle, i_kx, i_ky] = E_diff_list[cycle]
-            single_particle_dm[i_kx, i_ky, :, :] = S.matrix
+            single_particle_dm[i_kx, i_ky, :, :] = dm
     
     # If n_cycles=1, return 2D array for backward compatibility
     if n_cycles == 1:
@@ -423,6 +431,37 @@ def run_simulation_over_momentum_grid(kx_list, ky_list, strength_durations, n_cy
     else:
         return E_diff, single_particle_dm
 
+
+def simulate_grid_with_analysis(kx_list, ky_list, strength_durations, n_cycles=1):
+    """
+    Simulate variational circuit over a momentum grid and calculate analysis metrics
+    
+    Args:
+        kx_list, ky_list: momentum space grids
+        strength_durations: circuit parameters
+        n_cycles: number of cooling cycles to perform
+    
+    Returns:
+        tuple: (E_diff, single_particle_dm, total_chern_number, system_chern_number, bath_chern_number, energy_density)
+    """
+    # Run simulation
+    E_diff, single_particle_dm = simulate_grid(kx_list, ky_list, strength_durations, n_cycles, verbose=False)
+    
+    # Calculate Chern numbers
+    total_chern_number = get_chern_number_from_single_particle_dm(single_particle_dm)
+    system_chern_number = get_chern_number_from_single_particle_dm(single_particle_dm[:,:,:2,:2])
+    bath_chern_number = get_chern_number_from_single_particle_dm(single_particle_dm[:,:,2:,2:])
+    
+    # Calculate average energy density (use final cycle if multiple cycles)
+    if n_cycles == 1:
+        energy_density = np.nanmean(E_diff) / 2  # E_diff is 2D
+    else:
+        energy_density = np.nanmean(E_diff[-1, :, :]) / 2  # E_diff is 3D, use final cycle
+    
+    return E_diff, single_particle_dm, total_chern_number, system_chern_number, bath_chern_number, energy_density
+
+
+# ===== Parameter Management Functions =====
 
 def strength_durations_to_vector(strength_durations):
     """Convert strength_durations dictionary to a flat vector for optimization"""
@@ -443,6 +482,8 @@ def vector_to_strength_durations(vector):
     return strength_durations
 
 
+# ===== Optimization Functions =====
+
 def objective_function(vector, kx_list, ky_list, n_cycles=1, verbose=False):
     """
     Objective function to minimize: energy density
@@ -460,7 +501,7 @@ def objective_function(vector, kx_list, ky_list, n_cycles=1, verbose=False):
         print(f"    Evaluating objective function on {len(kx_list)}x{len(ky_list)} grid with {n_cycles} cycles...")
     
     # Use helper function to run simulation
-    E_diff, _ = run_simulation_over_momentum_grid(kx_list, ky_list, strength_durations, n_cycles, verbose)
+    E_diff, _ = simulate_grid(kx_list, ky_list, strength_durations, n_cycles, verbose)
     
     # Calculate average energy density
     # energy_density = np.nanmean(E_diff[-1, :, :]) / 2  # Divide by 2 because we count k and -k together
@@ -569,6 +610,8 @@ def optimize_strength_durations(kx_list, ky_list, n_cycles=1, initial_strength_d
     return optimized_strength_durations, result
 
 
+# ===== I/O Functions =====
+
 def save_optimized_parameters_for_res_p(strength_durations, res, p, output_dir=None):
     """
     Save optimized parameters for a specific (res, p) combination
@@ -629,6 +672,8 @@ def load_optimized_parameters(filename=None):
     print(f"Loaded optimized parameters from {filename}")
     return strength_durations
 
+
+# ===== Evaluation Functions =====
 
 def evaluate_loaded_parameters(res_val, p_val, parameter_file=None, input_dir=None, 
                                 n_k_points_test_fixed=None, n_cycles_train_eval=None, n_cycles_test_eval=None,
@@ -706,9 +751,9 @@ def evaluate_loaded_parameters(res_val, p_val, parameter_file=None, input_dir=No
         
         # Evaluate on training grid
         E_diff_train, single_particle_dm_train, total_chern_number_train, system_chern_number_train, \
-        bath_chern_number_train, energy_density_train = run_simulation_on_grid(
+        bath_chern_number_train, energy_density_train = simulate_grid_with_analysis(
             kx_list_train, ky_list_train, strength_durations, 
-            n_cycles=n_cycles_train_eval, grid_name="Training", plot=False
+            n_cycles=n_cycles_train_eval
         )
         
         # Print and plot training results
@@ -725,9 +770,9 @@ def evaluate_loaded_parameters(res_val, p_val, parameter_file=None, input_dir=No
         kx_list_test = np.linspace(-np.pi, np.pi, n_k_points_test)
         ky_list_test = np.linspace(-np.pi, np.pi, n_k_points_test)
         E_diff_test, single_particle_dm_test, total_chern_number_test, system_chern_number_test, \
-        bath_chern_number_test, energy_density_test = run_simulation_on_grid(
+        bath_chern_number_test, energy_density_test = simulate_grid_with_analysis(
             kx_list_test, ky_list_test, strength_durations, 
-            n_cycles=n_cycles_test_eval, grid_name="Test", plot=False
+            n_cycles=n_cycles_test_eval
         )
         
         # Print and plot test results
@@ -755,6 +800,8 @@ def evaluate_loaded_parameters(res_val, p_val, parameter_file=None, input_dir=No
         n_k_points_train = old_n_k_points_train
         n_k_points_test = old_n_k_points_test
 
+
+# ===== Plotting Functions =====
 
 def plot_results(E_diff, optimized_strength_durations, grid_size, title_suffix="", show_training_points=False):
     """
@@ -869,45 +916,6 @@ def print_results(energy_density, total_chern_number, system_chern_number,
     print("="*60)
 
 
-def run_simulation_on_grid(kx_list, ky_list, strength_durations, n_cycles=1, grid_name="", plot=True):
-    """
-    Run simulation on a given momentum grid
-    
-    Args:
-        kx_list, ky_list: momentum space grids
-        strength_durations: circuit parameters
-        n_cycles: number of cooling cycles to perform
-        grid_name: name for display purposes
-        plot: whether to plot results
-    
-    Returns:
-        tuple: (E_diff, single_particle_dm, total_chern_number, system_chern_number, bath_chern_number, energy_density)
-    """
-    grid_size = len(kx_list)
-    print(f"{grid_name} grid: {grid_size}x{grid_size} = {grid_size**2} points")
-    
-    # Use helper function to run simulation
-    E_diff, single_particle_dm = run_simulation_over_momentum_grid(kx_list, ky_list, strength_durations, n_cycles, verbose=False)
-    
-    # Calculate Chern numbers
-    total_chern_number = get_chern_number_from_single_particle_dm(single_particle_dm)
-    system_chern_number = get_chern_number_from_single_particle_dm(single_particle_dm[:,:,:2,:2])
-    bath_chern_number = get_chern_number_from_single_particle_dm(single_particle_dm[:,:,2:,2:])
-    
-    # Calculate average energy density (use final cycle if multiple cycles)
-    if n_cycles == 1:
-        energy_density = np.nanmean(E_diff) / 2  # E_diff is 2D
-    else:
-        energy_density = np.nanmean(E_diff[-1, :, :]) / 2  # E_diff is 3D, use final cycle
-    
-    if plot:
-        # Use final cycle for plotting
-        E_diff_plot = E_diff[-1, :, :] if n_cycles > 1 else E_diff
-        plot_results(E_diff_plot, strength_durations, grid_size, f"{grid_name} ")
-    
-    return E_diff, single_particle_dm, total_chern_number, system_chern_number, bath_chern_number, energy_density
-
-
 def evaluate_initialization(strength_durations, kx_list_train, ky_list_train, n_cycles_eval=1, check_monotonic=True):
     """
     Evaluate a single initialization by computing its steady state energy density
@@ -923,7 +931,7 @@ def evaluate_initialization(strength_durations, kx_list_train, ky_list_train, n_
         is_monotonic: whether energy decreases monotonically between cycles 2-5
     """
     # Use helper function to run simulation
-    E_diff, _ = run_simulation_over_momentum_grid(kx_list_train, ky_list_train, strength_durations, n_cycles_eval, verbose=False)
+    E_diff, _ = simulate_grid(kx_list_train, ky_list_train, strength_durations, n_cycles_eval, verbose=False)
     
     # Calculate average energy density
     if n_cycles_eval == 1:
@@ -1016,6 +1024,8 @@ def find_best_initialization(kx_list_train, ky_list_train, n_random_trials=10, n
     return best_strength_durations, best_energy_density, all_energies, monotonic_count
 
 
+# ===== Main Workflow Functions =====
+
 def train_variational_circuit():
     """
     Train the variational circuit using a smaller momentum grid
@@ -1051,38 +1061,6 @@ def train_variational_circuit():
     return optimized_strength_durations, opt_result
 
 
-def test_variational_circuit(optimized_strength_durations):
-    """
-    Test the variational circuit using a larger momentum grid
-    """
-    print("\n" + "="*60)
-    print("TESTING PHASE")
-    print("="*60)
-    
-    # Create testing momentum space grid
-    kx_list_test = np.linspace(-np.pi, np.pi, n_k_points_test)
-    ky_list_test = np.linspace(-np.pi, np.pi, n_k_points_test)
-    
-    # Run simulation using helper function
-    return run_simulation_on_grid(kx_list_test, ky_list_test, optimized_strength_durations, n_cycles_test, "Testing", plot=False)
-
-
-def run_training_grid_simulation(optimized_strength_durations):
-    """
-    Run simulation on the training grid to get results for comparison
-    """
-    print("\n" + "="*60)
-    print("TRAINING GRID SIMULATION")
-    print("="*60)
-    
-    # Create training momentum space grid
-    kx_list_train = np.linspace(-np.pi, np.pi, n_k_points_train)
-    ky_list_train = np.linspace(-np.pi, np.pi, n_k_points_train)
-    
-    # Run simulation using helper function
-    return run_simulation_on_grid(kx_list_train, ky_list_train, optimized_strength_durations, n_cycles_test, "Training", plot=False)
-
-
 def plot_energy_density_vs_cycles(kx_list_train, ky_list_train, kx_list_test, ky_list_test, strength_durations, max_cycles=20):
     """
     Plot energy density as a function of the number of cooling cycles for both training and test grids
@@ -1097,11 +1075,11 @@ def plot_energy_density_vs_cycles(kx_list_train, ky_list_train, kx_list_test, ky
     
     # Run simulation for training grid
     print(f"  Running simulation on training grid ({len(kx_list_train)}x{len(ky_list_train)}) with {max_cycles} cycles...")
-    E_diff_train_all_cycles, _ = run_simulation_over_momentum_grid(kx_list_train, ky_list_train, strength_durations, max_cycles, verbose=False)
+    E_diff_train_all_cycles, _ = simulate_grid(kx_list_train, ky_list_train, strength_durations, max_cycles, verbose=False)
     
     # Run simulation for test grid
     print(f"  Running simulation on test grid ({len(kx_list_test)}x{len(ky_list_test)}) with {max_cycles} cycles...")
-    E_diff_test_all_cycles, _ = run_simulation_over_momentum_grid(kx_list_test, ky_list_test, strength_durations, max_cycles, verbose=False)
+    E_diff_test_all_cycles, _ = simulate_grid(kx_list_test, ky_list_test, strength_durations, max_cycles, verbose=False)
     
     # Calculate energy densities for each cycle count
     cycle_counts = range(1, max_cycles + 1)
@@ -1160,98 +1138,29 @@ def plot_energy_density_vs_cycles(kx_list_train, ky_list_train, kx_list_test, ky
     return cycle_counts, energy_densities_train, energy_densities_test
 
 
-def evaluate_trotterized_initialization(res_val, p_val, n_k_points_test_fixed):
+# ===== Progressive Circuit Expansion Functions =====
+
+def run_single_experiment(p_val, kx_list_train, ky_list_train, kx_list_test, ky_list_test, initial_strength_durations=None):
     """
-    Evaluate energy density of trotterized initialization without optimization
+    Run a single experiment with given parameters
     
     Args:
-        res_val: resolution parameter (n_k_points_train = 1 + 6*res_val)
         p_val: number of layers in the circuit
-        n_k_points_test_fixed: fixed test grid size
-    
-    Returns:
-        tuple: (energy_density_train, energy_density_test)
-    """
-    global p, n_k_points_train, n_k_points_test
-    
-    # Store original values
-    old_p = p
-    old_n_k_points_train = n_k_points_train
-    old_n_k_points_test = n_k_points_test
-    
-    try:
-        # Set new parameters
-        p = p_val
-        n_k_points_train = 1 + 6 * res_val
-        n_k_points_test = n_k_points_test_fixed
-        
-        # Create training momentum space grid
-        kx_list_train = np.linspace(-np.pi, np.pi, n_k_points_train)
-        ky_list_train = np.linspace(-np.pi, np.pi, n_k_points_train)
-        
-        # Get trotterized evolution parameters (no optimization)
-        trotterized_params = trotterized_evolution_parameters(num_steps=p)
-        
-        # Evaluate on training grid (using n_cycles_train)
-        _, _, _, _, _, energy_density_train = run_simulation_on_grid(
-            kx_list_train, ky_list_train, trotterized_params, 
-            n_cycles=n_cycles_train, grid_name="Training", plot=False
-        )
-        
-        # Evaluate on test grid (using n_cycles_test)
-        kx_list_test = np.linspace(-np.pi, np.pi, n_k_points_test)
-        ky_list_test = np.linspace(-np.pi, np.pi, n_k_points_test)
-        _, _, _, _, _, energy_density_test = run_simulation_on_grid(
-            kx_list_test, ky_list_test, trotterized_params, 
-            n_cycles=n_cycles_test, grid_name="Test", plot=False
-        )
-        
-        return energy_density_train, energy_density_test
-        
-    finally:
-        # Restore original values
-        p = old_p
-        n_k_points_train = old_n_k_points_train
-        n_k_points_test = old_n_k_points_test
-
-
-def run_single_experiment(res_val, p_val, n_k_points_test_fixed, initial_strength_durations=None):
-    """
-    Run a single experiment with given res and p values
-    
-    Args:
-        res_val: resolution parameter (n_k_points_train = 1 + 6*res_val)
-        p_val: number of layers in the circuit
-        n_k_points_test_fixed: fixed test grid size
+        kx_list_train, ky_list_train: training momentum space grids
+        kx_list_test, ky_list_test: test momentum space grids
         initial_strength_durations: optional initial parameters (if None, uses trotterized)
     
     Returns:
         tuple: (energy_density_train, energy_density_test, optimized_strength_durations)
     """
-    global p, n_k_points_train, n_k_points_test
+    global p
     
-    # Store original values
+    # Store original value
     old_p = p
-    old_n_k_points_train = n_k_points_train
-    old_n_k_points_test = n_k_points_test
     
     try:
-        # Set new parameters
+        # Set new parameter
         p = p_val
-        n_k_points_train = 1 + 6 * res_val
-        n_k_points_test = n_k_points_test_fixed
-        
-        # Note: No need to clear cache since p is now passed as parameter
-        
-        print(f"\n{'='*60}")
-        print(f"Experiment: res={res_val}, p={p_val}")
-        print(f"Training grid: {n_k_points_train}x{n_k_points_train}")
-        print(f"Test grid: {n_k_points_test}x{n_k_points_test}")
-        print(f"{'='*60}")
-        
-        # Create training momentum space grid
-        kx_list_train = np.linspace(-np.pi, np.pi, n_k_points_train)
-        ky_list_train = np.linspace(-np.pi, np.pi, n_k_points_train)
         
         # Get initialization parameters
         if initial_strength_durations is None:
@@ -1266,35 +1175,28 @@ def run_single_experiment(res_val, p_val, n_k_points_test_fixed, initial_strengt
         )
         
         # Evaluate on training grid (using n_cycles_train to match training)
-        _, _, _, _, _, energy_density_train = run_simulation_on_grid(
+        _, _, _, _, _, energy_density_train = simulate_grid_with_analysis(
             kx_list_train, ky_list_train, optimized_strength_durations, 
-            n_cycles=n_cycles_train, grid_name="Training", plot=False
+            n_cycles=n_cycles_train
         )
         
         # Evaluate on test grid (using n_cycles_test)
-        kx_list_test = np.linspace(-np.pi, np.pi, n_k_points_test)
-        ky_list_test = np.linspace(-np.pi, np.pi, n_k_points_test)
-        _, _, _, _, _, energy_density_test = run_simulation_on_grid(
+        _, _, _, _, _, energy_density_test = simulate_grid_with_analysis(
             kx_list_test, ky_list_test, optimized_strength_durations, 
-            n_cycles=n_cycles_test, grid_name="Test", plot=False
+            n_cycles=n_cycles_test
         )
-        
-        print(f"  ✓ Energy density (train): {energy_density_train:.6f}")
-        print(f"  ✓ Energy density (test):  {energy_density_test:.6f}")
         
         return energy_density_train, energy_density_test, optimized_strength_durations
         
     finally:
-        # Restore original values
+        # Restore original value
         p = old_p
-        n_k_points_train = old_n_k_points_train
-        n_k_points_test = old_n_k_points_test
 
 
-def run_grid_search_experiment(output_csv=None, params_output_dir=None,
-                               trotterized_csv=None):
+def run_progressive_circuit_expansion(output_csv=None, params_output_dir=None,
+                                     trotterized_csv=None):
     """
-    Run grid search over res and p values
+    Run progressive circuit expansion over res and p values
     
     Args:
         output_csv: filename for saving optimized results
@@ -1305,15 +1207,15 @@ def run_grid_search_experiment(output_csv=None, params_output_dir=None,
         tuple: (optimized_results, trotterized_results) as lists of dictionaries
     """
     if output_csv is None:
-        output_csv = os.path.join(DATA_DIR, 'grid_search_results.csv')
+        output_csv = os.path.join(DATA_DIR, 'progressive_circuit_expansion_results.csv')
     if params_output_dir is None:
         params_output_dir = os.path.join(DATA_DIR, 'optimized_parameters')
     if trotterized_csv is None:
-        trotterized_csv = os.path.join(DATA_DIR, 'grid_search_results_trotterized.csv')
+        trotterized_csv = os.path.join(DATA_DIR, 'progressive_circuit_expansion_trotterized.csv')
     
     # Parameter ranges
     res_values = [3]
-    p_values = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+    p_values = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
     
     # Fixed test grid size (use current default)
     n_k_points_test_fixed = 1 + 6*20  # 121
@@ -1326,7 +1228,7 @@ def run_grid_search_experiment(output_csv=None, params_output_dir=None,
     experiment_count = 0
     
     print(f"\n{'='*60}")
-    print("GRID SEARCH EXPERIMENT")
+    print("PROGRESSIVE CIRCUIT EXPANSION EXPERIMENT")
     print(f"{'='*60}")
     print(f"Testing {len(res_values)} res values: {res_values}")
     print(f"Testing {len(p_values)} p values: {p_values}")
@@ -1341,72 +1243,44 @@ def run_grid_search_experiment(output_csv=None, params_output_dir=None,
     # Each res value is completely independent - starts fresh with trotterized for smallest p
     previous_optimized = {}  # key: res, value: (prev_p, optimized_strength_durations)
     
+    kx_list_test = np.linspace(-np.pi, np.pi, n_k_points_test_fixed)
+    ky_list_test = np.linspace(-np.pi, np.pi, n_k_points_test_fixed)
+
     for res in res_values:
         # Each res starts fresh - no state carried over from previous res values
+        # Generate grids for this res value (they're the same for all p values)
+        n_k_points_train_res = 1 + 6 * res
+        kx_list_train = np.linspace(-np.pi, np.pi, n_k_points_train_res)
+        ky_list_train = np.linspace(-np.pi, np.pi, n_k_points_train_res)
+        
         for p_val in p_values:
             experiment_count += 1
             exp_start_time = time.time()
             
             print(f"\n[{experiment_count}/{total_experiments}] Running res={res}, p={p_val}...")
             
-            # Evaluate trotterized initialization first
-            try:
-                print(f"  Evaluating trotterized initialization...")
-                trot_energy_train, trot_energy_test = evaluate_trotterized_initialization(
-                    res, p_val, n_k_points_test_fixed
-                )
-                
-                trotterized_results.append({
-                    'res': res,
-                    'n_k_points_train': 1 + 6 * res,
-                    'p': p_val,
-                    'energy_density_train': trot_energy_train,
-                    'energy_density_test': trot_energy_test
-                })
-                
-                # Save trotterized results after each experiment
-                save_results_to_csv(trotterized_results, trotterized_csv)
-                print(f"  Trotterized: train={trot_energy_train:.6f}, test={trot_energy_test:.6f}")
-                print(f"  Trotterized results saved to {trotterized_csv}")
-                
-            except Exception as e:
-                print(f"  ✗ Trotterized evaluation failed: {str(e)}")
-                trotterized_results.append({
-                    'res': res,
-                    'n_k_points_train': 1 + 6 * res,
-                    'p': p_val,
-                    'energy_density_train': np.nan,
-                    'energy_density_test': np.nan,
-                    'error': str(e)
-                })
-                save_results_to_csv(trotterized_results, trotterized_csv)
-            
             # Now run optimization
             try:
                 # Determine initial parameters
                 # For the first p value of each res, always start with trotterized initialization
                 # For subsequent p values of the same res, expand from previous optimized circuit
-                initial_params = None
                 if res in previous_optimized:
                     prev_p, prev_optimized = previous_optimized[res]
                     if p_val > prev_p:
                         # Expand previous optimized circuit by inserting zero layers
                         print(f"  Expanding circuit from p={prev_p} to p={p_val}...")
                         initial_params = expand_strength_durations(prev_optimized, prev_p, p_val)
-                    elif p_val == prev_p:
-                        # Same p value, use previous optimized (shouldn't happen with sorted p_values)
-                        initial_params = prev_optimized
                     else:
                         # p decreased (shouldn't happen), restart with trotterized
-                        print(f"  Warning: p decreased from {prev_p} to {p_val}, restarting with trotterized initialization")
-                        initial_params = None
+                        raise ValueError(f"p decreased from {prev_p} to {p_val}, restarting with trotterized initialization")
                 else:
                     # First p value for this res - always use trotterized initialization
                     print(f"  Starting with trotterized initialization (first p={p_val} for res={res})")
-                    initial_params = None  # Will trigger trotterized initialization in run_single_experiment
+                    # initial_params = None  # Will trigger trotterized initialization in run_single_experiment
+                    initial_params, _, _, _ = find_best_initialization(kx_list_train, ky_list_train, n_random_trials=100, n_cycles_eval=n_cycles_train, std=1.0, require_monotonic=True)
                 
                 energy_density_train, energy_density_test, optimized_strength_durations = run_single_experiment(
-                    res, p_val, n_k_points_test_fixed, initial_strength_durations=initial_params
+                    p_val, kx_list_train, ky_list_train, kx_list_test, ky_list_test, initial_strength_durations=initial_params
                 )
                 
                 # Store optimized parameters for next iteration
@@ -1456,7 +1330,7 @@ def run_grid_search_experiment(output_csv=None, params_output_dir=None,
     save_results_to_csv(results, output_csv)
     
     print(f"\n{'='*60}")
-    print("GRID SEARCH COMPLETE")
+    print("PROGRESSIVE CIRCUIT EXPANSION COMPLETE")
     print(f"{'='*60}")
     print(f"Total experiments: {experiment_count}/{total_experiments}")
     print(f"Total time: {total_time/60:.1f} minutes")
@@ -1502,10 +1376,24 @@ def main():
     optimized_strength_durations, opt_result = train_variational_circuit()
     
     # Phase 2: Testing
-    E_diff_test, single_particle_dm_test, total_chern_number_test, system_chern_number_test, bath_chern_number_test, energy_density_test = test_variational_circuit(optimized_strength_durations)
+    print("\n" + "="*60)
+    print("TESTING PHASE")
+    print("="*60)
+    kx_list_test = np.linspace(-np.pi, np.pi, n_k_points_test)
+    ky_list_test = np.linspace(-np.pi, np.pi, n_k_points_test)
+    E_diff_test, single_particle_dm_test, total_chern_number_test, system_chern_number_test, bath_chern_number_test, energy_density_test = simulate_grid_with_analysis(
+        kx_list_test, ky_list_test, optimized_strength_durations, n_cycles_test
+    )
 
     # Phase 2.5: Training grid simulation
-    E_diff_train, single_particle_dm_train, total_chern_number_train, system_chern_number_train, bath_chern_number_train, energy_density_train = run_training_grid_simulation(optimized_strength_durations)
+    print("\n" + "="*60)
+    print("TRAINING GRID SIMULATION")
+    print("="*60)
+    kx_list_train = np.linspace(-np.pi, np.pi, n_k_points_train)
+    ky_list_train = np.linspace(-np.pi, np.pi, n_k_points_train)
+    E_diff_train, single_particle_dm_train, total_chern_number_train, system_chern_number_train, bath_chern_number_train, energy_density_train = simulate_grid_with_analysis(
+        kx_list_train, ky_list_train, optimized_strength_durations, n_cycles_test
+    )
 
     # Phase 3: Energy density vs cycles analysis
     print("\n" + "="*60)
@@ -1545,10 +1433,10 @@ def main():
 if __name__ == "__main__":
     import sys
     
-    # Check if user wants to run grid search
-    if len(sys.argv) > 1 and sys.argv[1] == '--grid-search':
-        output_file = sys.argv[2] if len(sys.argv) > 2 else os.path.join(DATA_DIR, 'grid_search_results.csv')
-        trot_file = sys.argv[3] if len(sys.argv) > 3 else os.path.join(DATA_DIR, 'grid_search_results_trotterized.csv')
-        run_grid_search_experiment(output_csv=output_file, trotterized_csv=trot_file)
+    # Check if user wants to run progressive circuit expansion
+    if True:
+        output_file = sys.argv[2] if len(sys.argv) > 2 else os.path.join(DATA_DIR, 'progressive_circuit_expansion_results.csv')
+        trot_file = sys.argv[3] if len(sys.argv) > 3 else os.path.join(DATA_DIR, 'progressive_circuit_expansion_trotterized.csv')
+        run_progressive_circuit_expansion(output_csv=output_file, trotterized_csv=trot_file)
     else:
         main()
