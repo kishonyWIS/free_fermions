@@ -1,9 +1,15 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import os
+
+# Data directory path (relative to this file)
+DATA_DIR = os.path.join(os.path.dirname(__file__), '../data')
 
 
-def main(csv_path: str = "grid_search_results_monotonic_good_starting_from_p3.csv") -> None:
+def main(csv_path: str = None) -> None:
+    if csv_path is None:
+        csv_path = os.path.join(DATA_DIR, "grid_search_results_monotonic_good_starting_from_p3.csv")
     df = pd.read_csv(csv_path)
 
     # Use test energy for plots; drop failures
@@ -44,7 +50,8 @@ def main(csv_path: str = "grid_search_results_monotonic_good_starting_from_p3.cs
     )
 
     #save the figure
-    plt.savefig("energy_vs_p_by_res.pdf")
+    fig_path = os.path.join(os.path.dirname(__file__), "../figures/energy_vs_p_by_res.pdf")
+    plt.savefig(fig_path)
 
 if __name__ == "__main__":
     main()

@@ -1,13 +1,24 @@
 from itertools import product
 import numpy as np
 from matplotlib import pyplot as plt
-from time_dependence_functions import get_g, get_B
-from translational_invariant_KSL import get_KSL_model, get_Delta, get_f
 from scipy.optimize import minimize
 import numba
 from numba import jit, complex128, float64, int32
 import time
 import csv
+import sys
+import os
+
+# Add project root to path to access root-level dependencies
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+from time_dependence_functions import get_g, get_B
+from translational_invariant_KSL import get_KSL_model, get_Delta, get_f
+
+# Data directory path (relative to this file)
+DATA_DIR = os.path.join(os.path.dirname(__file__), '../data')
 
 # Set random seed for reproducibility
 # np.random.seed(42)
@@ -558,7 +569,7 @@ def optimize_strength_durations(kx_list, ky_list, n_cycles=1, initial_strength_d
     return optimized_strength_durations, result
 
 
-def save_optimized_parameters_for_res_p(strength_durations, res, p, output_dir='optimized_parameters'):
+def save_optimized_parameters_for_res_p(strength_durations, res, p, output_dir=None):
     """
     Save optimized parameters for a specific (res, p) combination
     
@@ -566,12 +577,13 @@ def save_optimized_parameters_for_res_p(strength_durations, res, p, output_dir='
         strength_durations: Dictionary with optimized parameters
         res: resolution parameter
         p: number of layers
-        output_dir: directory to save parameters (default: 'optimized_parameters')
+        output_dir: directory to save parameters (default: DATA_DIR/optimized_parameters)
     
     Returns:
         filename: path to saved file
     """
-    import os
+    if output_dir is None:
+        output_dir = os.path.join(DATA_DIR, 'optimized_parameters')
     os.makedirs(output_dir, exist_ok=True)
     
     filename = os.path.join(output_dir, f'optimized_params_res{res}_p{p}.npz')
@@ -579,19 +591,20 @@ def save_optimized_parameters_for_res_p(strength_durations, res, p, output_dir='
     return filename
 
 
-def load_optimized_parameters_for_res_p(res, p, input_dir='optimized_parameters'):
+def load_optimized_parameters_for_res_p(res, p, input_dir=None):
     """
     Load optimized parameters for a specific (res, p) combination
     
     Args:
         res: resolution parameter
         p: number of layers
-        input_dir: directory containing saved parameters (default: 'optimized_parameters')
+        input_dir: directory containing saved parameters (default: DATA_DIR/optimized_parameters)
     
     Returns:
         strength_durations: Dictionary with loaded parameters
     """
-    import os
+    if input_dir is None:
+        input_dir = os.path.join(DATA_DIR, 'optimized_parameters')
     filename = os.path.join(input_dir, f'optimized_params_res{res}_p{p}.npz')
     
     if not os.path.exists(filename):
@@ -605,8 +618,10 @@ def load_optimized_parameters_for_res_p(res, p, input_dir='optimized_parameters'
     return strength_durations
 
 
-def load_optimized_parameters(filename='optimized_strength_durations.npz'):
+def load_optimized_parameters(filename=None):
     """Load previously optimized parameters from file"""
+    if filename is None:
+        filename = os.path.join(DATA_DIR, 'optimized_strength_durations.npz')
     data = np.load(filename)
     strength_durations = {}
     for term in ['Jx', 'Jy', 'Jz', 'kappa', 'g', 'B']:
@@ -615,7 +630,7 @@ def load_optimized_parameters(filename='optimized_strength_durations.npz'):
     return strength_durations
 
 
-def evaluate_loaded_parameters(res_val, p_val, parameter_file=None, input_dir='optimized_parameters', 
+def evaluate_loaded_parameters(res_val, p_val, parameter_file=None, input_dir=None, 
                                 n_k_points_test_fixed=None, n_cycles_train_eval=None, n_cycles_test_eval=None,
                                 plot=True):
     """
@@ -638,7 +653,6 @@ def evaluate_loaded_parameters(res_val, p_val, parameter_file=None, input_dir='o
     
     # Load parameters
     if parameter_file is not None:
-        import os
         if not os.path.exists(parameter_file):
             raise FileNotFoundError(f"Parameter file not found: {parameter_file}")
         data = np.load(parameter_file)
@@ -647,6 +661,8 @@ def evaluate_loaded_parameters(res_val, p_val, parameter_file=None, input_dir='o
             strength_durations[term] = data[term]
         print(f"Loaded parameters from {parameter_file}")
     else:
+        if input_dir is None:
+            input_dir = os.path.join(DATA_DIR, 'optimized_parameters')
         strength_durations = load_optimized_parameters_for_res_p(res_val, p_val, input_dir)
     
     # Verify p matches
@@ -1028,8 +1044,9 @@ def train_variational_circuit():
     )
     
     # Save optimized parameters
-    np.savez('optimized_strength_durations.npz', **optimized_strength_durations)
-    print("Optimized parameters saved to 'optimized_strength_durations.npz'")
+    save_path = os.path.join(DATA_DIR, 'optimized_strength_durations.npz')
+    np.savez(save_path, **optimized_strength_durations)
+    print(f"Optimized parameters saved to '{save_path}'")
     
     return optimized_strength_durations, opt_result
 
@@ -1274,8 +1291,8 @@ def run_single_experiment(res_val, p_val, n_k_points_test_fixed, initial_strengt
         n_k_points_test = old_n_k_points_test
 
 
-def run_grid_search_experiment(output_csv='grid_search_results.csv', params_output_dir='optimized_parameters', 
-                               trotterized_csv='grid_search_results_trotterized.csv'):
+def run_grid_search_experiment(output_csv=None, params_output_dir=None,
+                               trotterized_csv=None):
     """
     Run grid search over res and p values
     
@@ -1287,6 +1304,13 @@ def run_grid_search_experiment(output_csv='grid_search_results.csv', params_outp
     Returns:
         tuple: (optimized_results, trotterized_results) as lists of dictionaries
     """
+    if output_csv is None:
+        output_csv = os.path.join(DATA_DIR, 'grid_search_results.csv')
+    if params_output_dir is None:
+        params_output_dir = os.path.join(DATA_DIR, 'optimized_parameters')
+    if trotterized_csv is None:
+        trotterized_csv = os.path.join(DATA_DIR, 'grid_search_results_trotterized.csv')
+    
     # Parameter ranges
     res_values = [3]
     p_values = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
@@ -1523,8 +1547,8 @@ if __name__ == "__main__":
     
     # Check if user wants to run grid search
     if len(sys.argv) > 1 and sys.argv[1] == '--grid-search':
-        output_file = sys.argv[2] if len(sys.argv) > 2 else 'grid_search_results.csv'
-        trot_file = sys.argv[3] if len(sys.argv) > 3 else 'grid_search_results_trotterized.csv'
+        output_file = sys.argv[2] if len(sys.argv) > 2 else os.path.join(DATA_DIR, 'grid_search_results.csv')
+        trot_file = sys.argv[3] if len(sys.argv) > 3 else os.path.join(DATA_DIR, 'grid_search_results_trotterized.csv')
         run_grid_search_experiment(output_csv=output_file, trotterized_csv=trot_file)
     else:
         main()

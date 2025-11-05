@@ -1,10 +1,21 @@
 from itertools import product
 import numpy as np
 from matplotlib import pyplot as plt
-from time_dependence_functions import get_g, get_B
-from translational_invariant_KSL import get_KSL_model, get_Delta, get_f
 from scipy.optimize import minimize
 import time
+import sys
+import os
+
+# Add project root to path to access root-level dependencies
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+from time_dependence_functions import get_g, get_B
+from translational_invariant_KSL import get_KSL_model, get_Delta, get_f
+
+# Data directory path (relative to this file)
+DATA_DIR = os.path.join(os.path.dirname(__file__), '../data')
 
 # Set random seed for reproducibility
 # np.random.seed(42)
@@ -403,8 +414,10 @@ def optimize_strength_durations(kx_list, ky_list, n_cycles=1, initial_strength_d
     
     return optimized_strength_durations, result
 
-def load_optimized_parameters(filename='optimized_strength_durations.npz'):
+def load_optimized_parameters(filename=None):
     """Load previously optimized parameters from file"""
+    if filename is None:
+        filename = os.path.join(DATA_DIR, 'optimized_strength_durations.npz')
     data = np.load(filename)
     strength_durations = {}
     for term in ['Jx', 'Jy', 'Jz', 'kappa', 'g', 'B']:
@@ -586,8 +599,9 @@ def train_variational_circuit():
     )
     
     # Save optimized parameters
-    np.savez('optimized_strength_durations.npz', **optimized_strength_durations)
-    print("Optimized parameters saved to 'optimized_strength_durations.npz'")
+    save_path = os.path.join(DATA_DIR, 'optimized_strength_durations.npz')
+    np.savez(save_path, **optimized_strength_durations)
+    print(f"Optimized parameters saved to '{save_path}'")
     
     return optimized_strength_durations, opt_result
 
