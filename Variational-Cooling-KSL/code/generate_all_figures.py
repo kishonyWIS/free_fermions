@@ -266,7 +266,7 @@ def plot_parameters_vs_layer(res_val=3, p_val=5):
     labels = ['$\\alpha_x$ (Jx)', '$\\alpha_y$ (Jy)', '$\\alpha_z$ (Jz)', 
               '$\\beta$ ($\\kappa$)', '$\\gamma$ (g)', '$\\delta$ (B)']
     colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b']
-    linestyles = ['-', '--', '-.', ':', '-', '--']
+    linestyles = ['-', '-', '-', '-', '-', '-']
     
     for i, (term, label, color, ls) in enumerate(zip(terms, labels, colors, linestyles)):
         plt.plot(range(1, p_val + 1), strength_durations[term], 

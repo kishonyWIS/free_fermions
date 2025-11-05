@@ -14,7 +14,8 @@ DATA_DIR = os.path.join(os.path.dirname(__file__), '../data')
 from variational_circuit_KSL_numba import (
     load_optimized_parameters_for_res_p,
     simulate_grid_with_analysis,
-    n_cycles_test
+    n_cycles_test,
+    n_cycles_train
 )
 
 
@@ -81,7 +82,7 @@ def main(csv_path: str = None) -> None:
 
 def plot_chern_vs_p(df, res_vals=None):
     """
-    Generate chern_vs_p.pdf - Chern number vs. circuit depth p
+    Generate chern_vs_p.pdf - Finite size spectral Chern number (η) vs. circuit depth p
     
     Args:
         df: DataFrame with results from progressive circuit expansion
@@ -96,72 +97,80 @@ def plot_chern_vs_p(df, res_vals=None):
     if res_vals is None:
         res_vals = sorted(df["res"].unique())
     
-    # Focus on primary res value (usually res=3)
-    # Prefer res=3 if available, otherwise use the first one
-    if 3 in res_vals:
-        primary_res = 3
-    else:
-        primary_res = res_vals[0] if len(res_vals) > 0 else 3
-    print(f"Focusing on res={primary_res}")
-    
-    # Get p values for this res
-    df_res = df[df.res == primary_res].sort_values("p")
-    p_vals = sorted(df_res["p"].unique())
-    
-    # Create test grid
+    # Create test grid (fixed for all res values)
     n_k_points_test = 1 + 6 * 20  # 121
     kx_list_test = np.linspace(-np.pi, np.pi, n_k_points_test)
     ky_list_test = np.linspace(-np.pi, np.pi, n_k_points_test)
     
-    system_chern_numbers = []
-    bath_chern_numbers = []
-    p_vals_valid = []
+    plt.figure(figsize=(7, 4))
     
-    for p_val in p_vals:
-        print(f"  Evaluating p={p_val}...")
+    # Plot for each res value (similar to energy_vs_p_by_res)
+    for res in res_vals:
+        print(f"Processing res={res}...")
         
-        try:
-            # Load parameters
-            strength_durations = load_optimized_parameters_for_res_p(primary_res, p_val)
+        # Get p values for this res
+        df_res = df[df.res == res].sort_values("p")
+        p_vals = sorted(df_res["p"].unique())
+        
+        # Calculate Chern numbers for training and test grids
+        system_chern_train = []
+        system_chern_test = []
+        p_vals_valid = []
+        
+        # Create training grid for this res
+        n_k_points_train = 1 + 6 * res
+        kx_list_train = np.linspace(-np.pi, np.pi, n_k_points_train)
+        ky_list_train = np.linspace(-np.pi, np.pi, n_k_points_train)
+        
+        for p_val in p_vals:
+            print(f"  Evaluating p={p_val}...")
             
-            # Set global p
-            vc_module.p = p_val
-            
-            # Run simulation
-            _, _, _, system_chern, bath_chern, _ = simulate_grid_with_analysis(
-                kx_list_test, ky_list_test, strength_durations, n_cycles=n_cycles_test
-            )
-            
-            system_chern_numbers.append(system_chern)
-            bath_chern_numbers.append(bath_chern)
-            p_vals_valid.append(p_val)
-            
-            print(f"    System Chern: {system_chern:.4f}, Bath Chern: {bath_chern:.4f}")
-            
-        except (FileNotFoundError, KeyError) as e:
-            print(f"    Warning: Could not evaluate p={p_val}: {e}")
+            try:
+                # Load parameters
+                strength_durations = load_optimized_parameters_for_res_p(res, p_val)
+                
+                # Set global p
+                vc_module.p = p_val
+                
+                # Run simulation on training grid (use training cycles to match energy evaluation)
+                _, _, _, system_chern_tr, _, _ = simulate_grid_with_analysis(
+                    kx_list_train, ky_list_train, strength_durations, n_cycles=n_cycles_train
+                )
+                
+                # Run simulation on test grid (use test cycles to match energy evaluation)
+                _, _, _, system_chern_te, _, _ = simulate_grid_with_analysis(
+                    kx_list_test, ky_list_test, strength_durations, n_cycles=n_cycles_test
+                )
+                
+                system_chern_train.append(system_chern_tr)
+                system_chern_test.append(system_chern_te)
+                p_vals_valid.append(p_val)
+                
+                print(f"    System η (train): {system_chern_tr:.4f}, System η (test): {system_chern_te:.4f}")
+                
+            except (FileNotFoundError, KeyError) as e:
+                print(f"    Warning: Could not evaluate p={p_val}: {e}")
+                continue
+        
+        if len(system_chern_test) == 0:
+            print(f"  Warning: No valid data points for res={res}, skipping...")
             continue
+        
+        # Plot test (solid) and train (dashed) with same color
+        line_test, = plt.plot(p_vals_valid, system_chern_test, "-o", 
+                             label=f"res={res}", linewidth=2)
+        color = line_test.get_color()
+        plt.plot(p_vals_valid, system_chern_train, "--o", color=color, 
+                alpha=0.8, linewidth=1.5)
     
-    if len(system_chern_numbers) == 0:
-        print("  Error: No valid data points found for Chern number plot")
-        return
+    # Add horizontal line at target value
+    plt.axhline(y=1.0, color='gray', linestyle=':', alpha=0.5, linewidth=1)
     
-    # Create plot
-    plt.figure(figsize=(8, 6))
-    plt.plot(p_vals_valid, system_chern_numbers, 'b-o', linewidth=2, markersize=8, 
-             label='System Chern number', color='#1f77b4')
-    plt.plot(p_vals_valid, bath_chern_numbers, 'r--s', linewidth=2, markersize=8, 
-             label='Bath Chern number', color='#d62728')
-    
-    # Add horizontal lines at target Chern numbers
-    plt.axhline(y=1.0, color='b', linestyle=':', alpha=0.5, linewidth=1)
-    plt.axhline(y=-1.0, color='r', linestyle=':', alpha=0.5, linewidth=1)
-    
-    plt.xlabel('Circuit Depth $p$', fontsize=12)
-    plt.ylabel('Chern Number', fontsize=12)
-    plt.title(f'Chern Number vs. Circuit Depth\n(res={primary_res}, test grid: {n_k_points_test}$\\times${n_k_points_test} points)', fontsize=12)
+    plt.xlabel("p", fontsize=12)
+    plt.ylabel("Finite size spectral Chern number $\\eta$", fontsize=12)
+    plt.title("Finite size spectral Chern number $\\eta$ vs. $p$ by res\n(solid=test, dashed=train)", fontsize=12)
     plt.grid(True, alpha=0.3)
-    plt.legend(fontsize=10)
+    plt.legend(title="res", ncol=2, fontsize=10)
     plt.tight_layout()
     
     # Save figure

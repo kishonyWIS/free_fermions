@@ -1,0 +1,386 @@
+\documentclass[twocolumn,
+aps,
+prx,
+showpacs,
+amsmath,
+amssymb,
+floatfix,
+longbibliography,
+superscriptaddress,
+eprint]
+{revtex4-1}
+
+\usepackage{xcolor}
+\definecolor{darkblue}{RGB}{0,0,150}
+\definecolor{nightblue}{RGB}{0,0,100}
+
+\usepackage{graphicx,mathtools,bm,bbm}
+\usepackage{MnSymbol}
+\usepackage[
+colorlinks,
+citecolor=darkblue,
+linkcolor=darkblue,
+urlcolor=nightblue]{hyperref}
+
+\usepackage[english]{babel}
+\usepackage[babel,kerning=true,spacing=true]{microtype}
+\usepackage[utf8]{inputenc}
+
+\usepackage{soul}
+
+\newcommand{\erez}[1]{{\color{red}{\bf EB: #1}}}
+\newcommand{\addEB}[1]{{\color{blue}{#1}}}
+\newcommand{\gilad}[1]{{\color{cyan}{\bf GK: #1}}}
+
+\newcommand{\ket}[1]{{\left|#1\right\rangle}}
+\newcommand{\tket}[1]{{|#1\rangle}}
+\newcommand{\bra}[1]{{\left\langle #1\right|}}
+\newcommand{\tbra}[1]{{\langle #1|}}
+\newcommand{\avg}[1]{{\left\langle #1\right\rangle}}
+\newcommand{\tavg}[1]{{\langle #1\rangle}}
+\newcommand{\dd}{\mathbf{d}}
+\newcommand{\vm}{\mathbf{m}}
+\newcommand{\B}{\mathbf{B}}
+\newcommand{\vsigma}{\bm{\sigma}}
+\newcommand{\A}{\mathbf{A}}
+\newcommand{\E}{\mathbf{E}}
+\newcommand{\T}{\mathcal{E}}
+\newcommand{\J}{\mathbf{J}}
+\newcommand{\rr}{\mathbf{r}}
+\newcommand{\Tr}[1]{{\mathrm{Tr}\left[#1\right]}}
+\newcommand{\defeq}{\overset{\scriptscriptstyle\mathrm{def}}{=}}
+\renewcommand{\vec}[1]{{\bf #1}}
+\newcommand{\vpd}{\vphantom{\dagger}}
+
+\begin{document}
+
+\title{Variational Cooling of Chiral Spin Liquids: \\ Shallow-Depth Circuit Optimization for the Kitaev Honeycomb Model}
+
+\author{Gilad Kishony}\email{gilad.kishony@weizmann.ac.il}
+\affiliation{Department of Condensed Matter Physics,
+Weizmann Institute of Science,
+Rehovot 76100, Israel}
+\author{Erez Berg}
+\affiliation{Department of Condensed Matter Physics,
+Weizmann Institute of Science,
+Rehovot 76100, Israel}
+
+\begin{abstract}
+We present a variational approach for efficiently preparing the ground state of the chiral phase of the Kitaev spin liquid (KSL) model using shallow-depth quantum circuits. By combining the fermionic cooling approach of Ref.~\cite{Kishony_2025} with the variational optimization strategy of Ref.~\cite{song2025varicoolnonunitaryquantumvariational}, we develop a protocol that replaces the large-depth Trotterized evolution (requiring on the order of 100 steps) with an optimized circuit containing only a few layers. The protocol is trained on small momentum-space grids and demonstrates good transferability to larger system sizes. We systematically explore the performance as a function of circuit depth and training grid resolution, showing that even with $p=5$ layers, the protocol achieves near-optimal cooling performance.
+\end{abstract}
+
+\maketitle
+
+\section{Introduction}
+
+The preparation of topologically non-trivial quantum states, particularly chiral states with non-Abelian anyon excitations, remains a central challenge in quantum simulation. The chiral phase of the Kitaev spin liquid (KSL) model on the honeycomb lattice provides an important test case, as it hosts emergent Majorana fermions with a non-zero Chern number that cannot be prepared by finite-depth local unitary circuits from product states~\cite{kitaev2006anyons}.
+
+Recent work has demonstrated that fermionic cooling protocols can efficiently prepare such states by coupling the system to a simulated fermionic bath~\cite{Kishony_2025}. However, these protocols typically require many Trotter steps (on the order of 100) to achieve adiabatic evolution, making them challenging to implement on near-term quantum hardware. Inspired by variational quantum algorithms such as QAOA~\cite{farhiQAOA} and the Vari-Cool protocol~\cite{Kishony_2025}, we develop a variational approach that compresses the cooling evolution into a shallow-depth circuit with only a few layers while maintaining high fidelity ground state preparation.
+
+\section{Model}
+
+\subsection{Target Hamiltonian: Kitaev Spin Liquid}
+
+The Kitaev spin liquid model consists of spin-$\frac{1}{2}$ degrees of freedom on a honeycomb lattice with anisotropic exchange interactions. The Hamiltonian is given by:
+\begin{align}
+H_{\text{KSL}}=&-\sum_{\alpha\in\{x,y,z\}}\mathcal{J}_{\alpha}\sum_{\langle\mathbf{I},\mathbf{J}\rangle\in \alpha\text{-bonds}}\sigma_{\mathbf{I}}^{\alpha}\sigma_{\mathbf{J}}^{\alpha}
+\nonumber\\
+&-\kappa\sum_{\langle\langle\mathbf{J},\mathbf{K},\mathbf{L}\rangle\rangle}\sigma_{\mathbf{J}}^{x}\sigma_{\mathbf{K}}^{y}\sigma_{\mathbf{L}}^{z},
+\label{eq: KSL}
+\end{align}
+where $\mathbf{J} = (i,j,s)$ denotes sites of the honeycomb lattice with unit cell indices $i,j$ and sublattice $s\in\{A,B\}$, $\sigma_{\mathbf{J}}^\alpha$ are Pauli matrices, $\mathcal{J}_x, \mathcal{J}_y, \mathcal{J}_z$ are the Kitaev exchange couplings, and $\kappa$ is a three-spin interaction that breaks time-reversal symmetry and drives the system into the chiral non-Abelian phase.
+
+\subsection{Modified Model for Cooling}
+
+To enable efficient cooling, we introduce a modified KSL Hamiltonian that includes both system ($\sigma$) and auxiliary bath ($\tau$) spins at each site:
+\begin{align}
+H(t)=\widetilde{H}_{\text{KSL}}+H_{{\rm c}}(t),
+\label{eq:H_KSL}
+\end{align}
+where
+\begin{align}
+\widetilde{H}_{\text{KSL}}=&-\sum_{\alpha\in\{x,y,z\}}\mathcal{J}_{\alpha}\sum_{\langle \mathbf{I},\mathbf{J}\rangle\in \alpha\text{-bonds}}\sigma_{\mathbf{I}}^{\alpha}\sigma_{\mathbf{J}}^{\alpha}\tau_{\mathbf{I}}^{z}\tau_{\mathbf{J}}^{z}\nonumber\\
+&-\kappa\sum_{\langle\langle \mathbf{J},\mathbf{K},\mathbf{L}\rangle\rangle}\sigma_{\mathbf{J}}^x\tau_{\mathbf{J}}^z\sigma_{\mathbf{K}}^y\tau_{\mathbf{K}}^z\sigma_{\mathbf{L}}^z
+\label{eq: KSL with spins}
+\end{align}
+and the control Hamiltonian is
+\begin{align}
+H_{{\rm c}}(t)=-\sum_{\mathbf{J}}B_{\mathbf{J}}(t)\tau_{\mathbf{J}}^{z}-\sum_{\mathbf{J}}g_{\J}(t)\tau_{\mathbf{J}}^{x}.
+\label{eq: control hamiltonian}
+\end{align}
+
+The system is illustrated in Fig.~\ref{fig:ksl_model}, showing the honeycomb lattice with system spins (black) and bath spins (white) at each site, with bonds colored according to their orientation ($x$-blue, $y$-green, $z$-red).
+
+\begin{figure}
+\begin{centering}
+\includegraphics[width=(\textwidth-\columnsep)/2]{../CoolingFermions2D/figures/Figure_2.pdf}
+\par\end{centering}
+\caption{\textbf{The generalized KSL model with bath spins.} Each unit cell consists of two system spins (black) and two bath spins (white). The bonds are colored according to orientation: $x$-blue, $y$-green, $z$-red. The five-spin term $\kappa$ drives the system into the chiral phase. The figure shows the structure of the model used for cooling, where auxiliary bath spins enable the fermionic cooling protocol.}
+\label{fig:ksl_model}
+\end{figure}
+
+\subsection{Fermionization and Momentum-Space Description}
+
+Following Ref.~\cite{Kishony_2025}, we fermionize both the system and bath spins, introducing Majorana operators $\{c_{\mathbf{J}}^{x},c_{\mathbf{J}}^{y},c_{\mathbf{J}}^{z},b_{\mathbf{J}}^{x},b_{\mathbf{J}}^{y},b_{\mathbf{J}}^{z}\}$ per site. In the flux-free sector with uniform $\tau^z_{\mathbf{J}}=1$ and a gauge where $u_{\mathbf{I},\mathbf{J}}=1$, the Hamiltonian becomes translationally invariant and can be Fourier transformed to momentum space.
+
+The fermionic Hamiltonian in momentum space is:
+\begin{align}
+H(t)=\sum_{\bm{k}}\bm{\Psi}_{\bm{k}}^\dagger H_{\bm{k}}(t)\bm{\Psi}_{\bm{k}},
+\end{align}
+where $\bm{\Psi}_{\bm{k}}^\dagger=\begin{pmatrix}c_{(\bm{k},A)}^{z\dagger}&
+c_{(\bm{k},B)}^{z\dagger}&
+c_{(\bm{k},A)}^{y\dagger}&
+c_{(\bm{k},B)}^{y\dagger}&
+c_{(\bm{k},A)}^{x\dagger}&
+c_{(\bm{k},B)}^{x\dagger}
+\end{pmatrix}$,
+and the $6 \times 6$ Hamiltonian matrix at each $\bm{k}$ is:
+\begin{align}
+H_{\bm{k}}(t)=\left(\begin{array}{ccc}
+h_{\bm{k}} & G(t) & 0\\
+G^{\dagger}(t) & 0 & -iB(t)\mathbb{I}\\
+0 & iB(t)\mathbb{I} & 0
+\end{array}\right).
+\label{eq:Hk}
+\end{align}
+
+Here, $h_{\bm{k}}$ is the $2 \times 2$ system Hamiltonian:
+\begin{align}
+h_{\bm{k}}&=\begin{pmatrix} \Delta(\bm{k}) & if(\bm{k})\\
+-if(-\bm{k}) & -\Delta(\bm{k})
+\end{pmatrix},
+\label{eq:h_k}
+\end{align}
+where
+\begin{align}
+\Delta(\bm{k})&=2\kappa\left[\sin{k_x}-\sin{k_y}+\sin{(k_y-k_x)}\right],\\
+f(\bm{k})&=\mathcal{J}_{x}+\mathcal{J}_{y}e^{-ik_{x}}+\mathcal{J}_{z}e^{-ik_{y}}.
+\end{align}
+
+The $2 \times 2$ matrix $G(t)$ describes hopping between system and bath fermions:
+\begin{align}
+G(t)=\begin{pmatrix} -ig(t)\Gamma_A & 0\\
+0 & -ig(t)\Gamma_B
+\end{pmatrix},
+\end{align}
+where we use $\Gamma_A=\Gamma_B=1$ corresponding to two cooling sublattices.
+
+The key advantage of this momentum-space description is that different $\bm{k}$ points are decoupled, allowing us to analyze and optimize the cooling protocol independently at each momentum point.
+
+\section{Variational Circuit}
+
+\subsection{Circuit Structure}
+
+Rather than implementing the full continuous-time adiabatic evolution through many Trotter steps, we design a variational circuit with $p$ layers, where each layer applies unitary gates corresponding to the different terms in the Hamiltonian. The circuit unitary for a single cooling cycle is constructed as a product of $p$ layers:
+\begin{align}
+U_{\text{cycle}} = \prod_{\ell=1}^{p} U_\ell,
+\end{align}
+where each layer $U_\ell$ consists of:
+\begin{align}
+U_\ell = U_B(\delta_\ell) \, U_g(\gamma_\ell) \, U_{\kappa}(\beta_\ell) \, U_{J_z}(\alpha_{z,\ell}) \, U_{J_y}(\alpha_{y,\ell}) \, U_{J_x}(\alpha_{x,\ell}).
+\label{eq:layer}
+\end{align}
+
+Each term corresponds to exponentiation of the corresponding Hamiltonian component:
+\begin{itemize}
+\item $U_{J_x}(\alpha_{x,\ell}) = \exp(-i \alpha_{x,\ell} \mathcal{J}_x \hat{H}_{J_x})$ for the $J_x$ bond interactions
+\item $U_{J_y}(\alpha_{y,\ell}) = \exp(-i \alpha_{y,\ell} \mathcal{J}_y \hat{H}_{J_y})$ for the $J_y$ bond interactions  
+\item $U_{J_z}(\alpha_{z,\ell}) = \exp(-i \alpha_{z,\ell} \mathcal{J}_z \hat{H}_{J_z})$ for the $J_z$ bond interactions
+\item $U_{\kappa}(\beta_\ell) = \exp(-i \beta_\ell \kappa \hat{H}_{\kappa})$ for the three-spin $\kappa$ term
+\item $U_g(\gamma_\ell) = \exp(-i \gamma_\ell g_0 \hat{H}_{g})$ for the system-bath coupling
+\item $U_B(\delta_\ell) = \exp(-i \delta_\ell B_0 \hat{H}_{B})$ for the bath Zeeman field
+\end{itemize}
+
+The variational parameters $\{\alpha_{x,\ell}, \alpha_{y,\ell}, \alpha_{z,\ell}, \beta_\ell, \gamma_\ell, \delta_\ell\}_{\ell=1}^p$ are optimized to minimize the energy density in the steady state achieved after multiple cooling cycles.
+
+\subsection{Circuit Implementation}
+
+In practice, we construct the circuit at each momentum point $\bm{k}$ by building the $6 \times 6$ unitary matrix $U_d(\bm{k})$ that acts on the fermionic operators. The circuit is implemented using Numba-optimized functions for efficient computation during training. Each layer applies the appropriate Pauli exponentiations to the relevant submatrices of the $6 \times 6$ Hamiltonian matrix.
+
+\section{Training Protocol}
+
+\subsection{Parameter Space Exploration}
+
+We employ a systematic approach to explore the performance of the variational circuit as a function of both the circuit depth $p$ and the training grid resolution. The training grid resolution is parameterized by $n_{\text{k,train}} = 1 + 6 \cdot \text{res}$, where $\text{res}$ is an integer resolution parameter. The test grid uses a fixed high resolution $n_{\text{k,test}} = 1 + 6 \cdot 20 = 121$ points in each direction.
+
+For each combination of $(\text{res}, p)$, we:
+\begin{enumerate}
+\item Initialize the circuit parameters (see below)
+\item Optimize the parameters to minimize the energy density on the training grid
+\item Evaluate the optimized circuit on both training and test grids
+\item Save the optimized parameters and results
+\end{enumerate}
+
+\subsection{Progressive Circuit Expansion}
+
+A key innovation in our training approach is the progressive expansion of the circuit depth. Rather than independently optimizing each value of $p$, we use a strategy where:
+
+\begin{enumerate}
+\item For the smallest $p$ value ($p_{\min}$), we initialize with Trotterized parameters from the continuous-time protocol
+\item For each subsequent $p > p_{\min}$, we expand the previous optimized circuit by inserting zero-valued layers at strategically chosen positions
+\item The expanded circuit is then re-optimized, providing a warm start that typically leads to better convergence
+\end{enumerate}
+
+This approach, implemented through the \texttt{expand\_strength\_durations} function, allows us to systematically explore increasing circuit depths while leveraging the optimization work done at smaller depths.
+
+\subsection{Parameter Initialization}
+
+For the initial circuit depth in each resolution, we initialize parameters using a coarse Trotterization of the continuous-time adiabatic cooling protocol. Specifically, we set:
+\begin{align}
+\alpha_{x,\ell} &= \alpha_{y,\ell} = \alpha_{z,\ell} = \Delta t, \\
+\beta_\ell &= \Delta t, \\
+\gamma_\ell &= g(t_\ell) \Delta t, \\
+\delta_\ell &= B(t_\ell) \Delta t,
+\end{align}
+where $\Delta t = T/p$ is the time step, $T$ is the total sweep time of the continuous protocol, $t_\ell = \ell \Delta t$, and $g(t)$ and $B(t)$ are the time-dependent coupling functions from the original adiabatic demagnetization protocol.
+
+\subsection{Loss Function}
+
+The objective function to minimize is the root-mean-square (RMS) energy density over the momentum space grid:
+\begin{align}
+\mathcal{L} = \sqrt{\frac{1}{N_{\text{k}}^2}\sum_{i,j} \left(\frac{E_{\text{diff}}(\bm{k}_{i,j})}{2}\right)^2},
+\end{align}
+where $E_{\text{diff}}(\bm{k}_{i,j}) = E(\bm{k}_{i,j}) - E_{\text{gs}}(\bm{k}_{i,j})$ is the energy difference from the ground state at momentum point $\bm{k}_{i,j}$, and the factor of $1/2$ accounts for the fact that we count both $\bm{k}$ and $-\bm{k}$ in our summation over the full Brillouin zone.
+
+The energy is evaluated after $n_{\text{cycles,train}}$ cooling cycles, where each cycle consists of:
+\begin{enumerate}
+\item Application of the variational circuit unitary $U_{\text{cycle}}$
+\item Reset of the bath fermions to their ground state
+\end{enumerate}
+
+\subsection{Training and Testing Sets}
+
+\begin{itemize}
+\item \textbf{Training set:} Momentum grid with $n_{\text{k,train}} \times n_{\text{k,train}}$ points, where $n_{\text{k,train}} = 1 + 6 \cdot \text{res}$. The training uses $n_{\text{cycles,train}} = 5$ cycles for optimization.
+
+\item \textbf{Testing set:} High-resolution momentum grid with $n_{\text{k,test}} \times n_{\text{k,test}}$ points, where $n_{\text{k,test}} = 121$ (fixed). The testing uses $n_{\text{cycles,test}} = 10$ cycles to evaluate steady-state performance.
+\end{itemize}
+
+The optimization is performed using the L-BFGS-B method from SciPy, with parameters bounded to the range $[-\pi, \pi]$ to avoid numerical issues.
+
+\section{Results}
+
+\subsection{Energy vs. Circuit Depth}
+
+\begin{figure}
+\begin{centering}
+\includegraphics[width=(\textwidth-\columnsep)/2]{figures/energy_vs_p_by_res.pdf}
+\par\end{centering}
+\caption{\textbf{Energy density vs. circuit depth $p$ for different training grid resolutions.} Solid lines show test grid performance, dashed lines show training grid performance. Results are shown for $\text{res} = 3$ (primary focus) and other resolutions. The protocol achieves near-optimal performance even with $p=3$ layers.}
+\label{fig:energy_vs_p}
+\end{figure}
+
+Figure~\ref{fig:energy_vs_p} shows the energy density as a function of circuit depth $p$ for different training grid resolutions. We observe that even with $p=3$ layers, the protocol achieves performance comparable to much deeper circuits, demonstrating the effectiveness of the variational optimization.
+
+\subsection{Finite Size Spectral Chern Number vs. Circuit Depth}
+
+To probe the convergence to the ground state, we define the finite size version of the spectral Chern number $\nu$:
+\begin{align}
+\label{eq:eta}
+\nu = \frac{1}{2\pi i}\int \Tr{R\left[\partial_{k_x}R,\partial_{k_y}R\right]}dk_xdk_y,
+\end{align}
+where $R$ is the single-particle density matrix of the system fermions. Specifically, $R_{s,s'}(\bm{k})=\left\langle c_{(\bm{k},s)}^{z\dagger} c_{(\bm{k},s')}^{z}\right\rangle$, where $c_{(\bm{k},s)}^{z}$ is the Fourier transform of the system fermion operators on sublattice $s$ with wavevector $\bm{k}$. In a pure Slater determinant state, this quantity becomes the integrated Chern density. We calculate this value by performing a discrete integral in momentum space.
+
+\begin{figure}
+\begin{centering}
+\includegraphics[width=(\textwidth-\columnsep)/2]{figures/chern_vs_p.pdf}
+\par\end{centering}
+\caption{\textbf{Finite size spectral Chern number $\nu$ vs. circuit depth $p$ for different training grid resolutions.} Solid lines show test grid performance, dashed lines show training grid performance. The target value is $\nu=1$ for the system fermions. Results are shown for $\text{res} = 3$ (primary focus) and other resolutions. The protocol successfully prepares states with the correct topological invariant even with shallow circuits.}
+\label{fig:chern_vs_p}
+\end{figure}
+
+Figure~\ref{fig:chern_vs_p} shows the finite size spectral Chern number $\nu$ of the prepared state as a function of circuit depth. The protocol successfully prepares states with the correct topological invariant ($\nu=1$ for system) even with shallow circuits, confirming that the topological properties are preserved despite the compression from the original Trotterized protocol.
+
+\subsection{Energy Convergence vs. Cycles}
+
+\begin{figure}
+\begin{centering}
+\includegraphics[width=(\textwidth-\columnsep)/2]{figures/energy_vs_cycles.pdf}
+\par\end{centering}
+\caption{\textbf{Energy density vs. number of cooling cycles for trained circuit with $\text{res}=3$, $p=5$.} Results are shown for both training grid (blue) and test grid (red). The protocol converges to a steady state within a few cycles.}
+\label{fig:energy_vs_cycles}
+\end{figure}
+
+Figure~\ref{fig:energy_vs_cycles} demonstrates the convergence of the energy density as a function of the number of cooling cycles. The protocol rapidly approaches its steady state, with most of the cooling occurring within the first few cycles.
+
+\subsection{Energy Heatmaps}
+
+\begin{figure}
+\begin{centering}
+\includegraphics[width=(\textwidth-\columnsep)/2]{figures/energy_heatmap_train.pdf}
+\par\end{centering}
+\caption{\textbf{Energy difference heatmap on the training grid ($19 \times 19$ points) for optimized circuit with $\text{res}=3$, $p=5$.} The color scale shows the energy difference from the ground state at each momentum point.}
+\label{fig:energy_heatmap_train}
+\end{figure}
+
+\begin{figure}
+\begin{centering}
+\includegraphics[width=(\textwidth-\columnsep)/2]{figures/energy_heatmap_test.pdf}
+\par\end{centering}
+\caption{\textbf{Energy difference heatmap on the test grid ($121 \times 121$ points) for optimized circuit with $\text{res}=3$, $p=5$.} Red crosses indicate the training grid points for comparison.}
+\label{fig:energy_heatmap_test}
+\end{figure}
+
+Figures~\ref{fig:energy_heatmap_train} and~\ref{fig:energy_heatmap_test} show the spatial distribution of energy differences in momentum space on the training and test grids, respectively. The protocol successfully cools the system across the entire Brillouin zone, with only small residual excitations remaining.
+
+\subsection{Optimized Parameters}
+
+\begin{figure}
+\begin{centering}
+\includegraphics[width=(\textwidth-\columnsep)/2]{figures/parameters_vs_layer.pdf}
+\par\end{centering}
+\caption{\textbf{Optimized variational parameters vs. layer number $\ell$ for circuit with $\text{res}=3$, $p=5$.} Different colors represent different parameter types: $\alpha_x$ (Jx), $\alpha_y$ (Jy), $\alpha_z$ (Jz), $\beta$ (kappa), $\gamma$ (g), and $\delta$ (B).}
+\label{fig:parameters_vs_layer}
+\end{figure}
+
+Figure~\ref{fig:parameters_vs_layer} displays the optimized variational parameters as a function of layer index. The parameters show a structured pattern that deviates from the naive Trotterized initialization, indicating that the optimization discovers non-trivial cooling pathways.
+
+\section{Discussion}
+
+Our results demonstrate that variational optimization can dramatically compress the depth of fermionic cooling circuits while maintaining high fidelity ground state preparation. The key insights are:
+
+\begin{itemize}
+\item \textbf{Shallow depth sufficiency:} Even with $p=3$ layers, the protocol achieves near-optimal performance, representing a $\sim 30\times$ compression compared to the original Trotterized protocol with $\sim 100$ steps.
+
+\item \textbf{Transferability:} Circuits trained on small momentum grids ($\text{res}=3$, corresponding to $19 \times 19$ points) generalize well to high-resolution test grids ($121 \times 121$ points), indicating that the optimization captures the essential physics of the cooling process.
+
+\item \textbf{Progressive expansion:} The strategy of progressively expanding circuit depth by inserting zero layers provides warm starts that improve optimization efficiency and convergence.
+
+\item \textbf{Topological preservation:} The optimized circuits successfully prepare states with the correct finite size spectral Chern number ($\nu=1$), confirming that topological properties are preserved despite the compression.
+\end{itemize}
+
+Future directions include extending this approach to interacting fermionic systems, exploring different circuit ansätze, and investigating the performance on quantum hardware with noise.
+
+\section{Methods}
+
+\subsection{Simulation Details}
+
+All simulations are performed using Numba-optimized Python code for efficient computation. The single-particle density matrix evolution is tracked using the free fermion framework, allowing simulation of systems with hundreds of momentum points.
+
+The optimization uses the L-BFGS-B algorithm from SciPy with the following settings:
+\begin{itemize}
+\item Maximum iterations: 1000
+\item Function tolerance: $10^{-9}$
+\item Gradient tolerance: $10^{-5}$
+\item Parameter bounds: $[-\pi, \pi]$
+\end{itemize}
+
+\subsection{Model Parameters}
+
+Throughout this work, we use:
+\begin{itemize}
+\item $\mathcal{J}_x = \mathcal{J}_y = \mathcal{J}_z = 1$
+\item $\kappa = 1$ (chiral phase)
+\item $g_0 = 0.5$ (maximum system-bath coupling)
+\item $B_0 = 7$ (initial bath Zeeman field)
+\item $T = 50$ (total sweep time for Trotterized initialization)
+\end{itemize}
+
+\begin{acknowledgements}
+G.K. was supported by CRC 183 of the Deutsche Forschungsgemeinschaft (subproject A01), a research grant from the Estate of Gerald Alexander, and ISF-MAFAT Quantum Science and Technology Grant no. 2478/24.
+\end{acknowledgements}
+
+\bibliography{References.bib}
+
+\end{document}
+
