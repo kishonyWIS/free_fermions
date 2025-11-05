@@ -4,6 +4,10 @@ from matplotlib import pyplot as plt
 from time_dependence_functions import get_g, get_B
 from translational_invariant_KSL import get_KSL_model, get_Delta, get_f
 from scipy.optimize import minimize
+import time
+
+# Set random seed for reproducibility
+# np.random.seed(42)
 
 # Pauli matrices
 sigma_x = np.array([[0, 1], [1, 0]], dtype=complex)
@@ -27,11 +31,12 @@ smoothed_B = lambda tt: get_B(tt, B0, B1, T) #lambda tt: 0#
 # Variational circuit parameters
 p = 10  # Number of layers in the variational circuit
 n_k_points_train = 1 + 6*1  # Training grid size
-n_k_points_test = 1 + 6*3   # Testing grid size
+n_k_points_test = 1 + 6*1   # Testing grid size
 
 # Cooling cycle parameters
 n_cycles_train = 5    # Number of cooling cycles for training
 n_cycles_test = 10     # Number of cooling cycles for testing
+epochs = 1000
 
 
 def get_chern_number_from_single_particle_dm(single_particle_dm):
@@ -162,6 +167,16 @@ def trotterized_evolution_parameters():
     
     return strength_durations
 
+def randn_strength_durations(std=1.0):
+    return {
+        'Jx': np.random.randn(p) * std,
+        'Jy': np.random.randn(p) * std,
+        'Jz': np.random.randn(p) * std,
+        'kappa': np.random.randn(p) * std,
+        'g': np.random.randn(p) * std,
+        'B': np.random.randn(p) * std,
+    }
+
 def multiple_cooling_cycles_variational(kx, ky, strength_durations, n_cycles=1):
     """
     Perform multiple cooling cycles using the variational circuit
@@ -221,17 +236,18 @@ def run_simulation_over_momentum_grid(kx_list, ky_list, strength_durations, n_cy
         verbose: whether to print progress
     
     Returns:
-        E_diff: 3D array of energy differences (n_cycles, grid_size, grid_size) or 2D array if n_cycles=1
+        E_diff: 3D array of energy differences (n_cycles, grid_size_x, grid_size_y) or 2D array if n_cycles=1
         single_particle_dm: 4D array of single-particle density matrices (optional)
     """
-    grid_size = len(kx_list)
-    E_diff = np.zeros((n_cycles, grid_size, grid_size))
-    single_particle_dm = np.zeros((grid_size, grid_size, 6, 6), dtype=complex)
+    grid_size_x = len(kx_list)
+    grid_size_y = len(ky_list)
+    E_diff = np.zeros((n_cycles, grid_size_x, grid_size_y))
+    single_particle_dm = np.zeros((grid_size_x, grid_size_y, 6, 6), dtype=complex)
     
     # Loop over momentum space
     for i_kx, kx in enumerate(kx_list):
         if verbose:
-            print(f'Processing kx={kx:.3f} ({i_kx+1}/{grid_size})')
+            print(f'Processing kx={kx:.3f} ({i_kx+1}/{grid_size_x})')
         for i_ky, ky in enumerate(ky_list):
             # Perform multiple cooling cycles with given parameters
             S, E_diff_list, E_gs = multiple_cooling_cycles_variational(kx, ky, strength_durations, n_cycles)
@@ -284,12 +300,14 @@ def objective_function(vector, kx_list, ky_list, n_cycles=1, verbose=False):
     E_diff, _ = run_simulation_over_momentum_grid(kx_list, ky_list, strength_durations, n_cycles, verbose)
     
     # Calculate average energy density
-    energy_density = np.nanmean(E_diff) / 2  # Divide by 2 because we count k and -k together
+    # energy_density = np.nanmean(E_diff[-1, :, :]) / 2  # Divide by 2 because we count k and -k together
+    # rms energy density
+    rms_energy_density = np.sqrt(np.nanmean(E_diff[-1, :, :]**2)) / 2
     
     if verbose:
-        print(f"    Objective function result: {energy_density:.6f}")
-    
-    return energy_density
+        # print(f"    Objective function result: {energy_density:.6f}")
+        print(f"    RMS energy density: {rms_energy_density:.6f}")
+    return rms_energy_density
 
 def optimize_strength_durations(kx_list, ky_list, n_cycles=1, initial_strength_durations=None, method='L-BFGS-B'):
     """
@@ -307,9 +325,7 @@ def optimize_strength_durations(kx_list, ky_list, n_cycles=1, initial_strength_d
     """
     print("Starting optimization...")
     
-    # Get initial guess
-    if initial_strength_durations is None:
-        initial_strength_durations = trotterized_evolution_parameters()
+    assert initial_strength_durations is not None
     
     # Convert to vector
     initial_vector = strength_durations_to_vector(initial_strength_durations)
@@ -317,13 +333,13 @@ def optimize_strength_durations(kx_list, ky_list, n_cycles=1, initial_strength_d
     
     # Set bounds: allow both positive and negative values for flexibility
     # but keep them reasonable (e.g., -10 to 10)
-    bounds = [(-10.0, 10.0)] * len(initial_vector)
+    bounds = None#[(-10.0, 10.0)] * len(initial_vector)
     
     print(f"Optimizing {len(initial_vector)} parameters using {method}")
     print(f"Initial energy density: {objective_function(initial_vector, kx_list, ky_list, n_cycles, verbose=True):.6f}")
     
     # Set up optimization options
-    options = {'maxiter': 5, 'disp': True, 'ftol': 1e-9, 'gtol': 1e-5}
+    options = {'maxiter': epochs, 'disp': True, 'ftol': 1e-9, 'gtol': 1e-5}
     max_iter = options['maxiter']
     
     # Create a wrapper class to track function evaluations efficiently
@@ -346,9 +362,13 @@ def optimize_strength_durations(kx_list, ky_list, n_cycles=1, initial_strength_d
     # Create wrapper and callback
     obj_wrapper = ObjectiveWrapper(objective_function, kx_list, ky_list, n_cycles)
     iteration_count = [0]
+    iteration_start_time = [time.time()]
     
     def callback(xk):
         iteration_count[0] += 1
+        current_time = time.time()
+        iteration_time = current_time - iteration_start_time[0]
+        
         # Use the cached value from the wrapper if available
         if obj_wrapper.last_value is not None and np.allclose(xk, obj_wrapper.last_x):
             current_energy = obj_wrapper.last_value
@@ -356,7 +376,8 @@ def optimize_strength_durations(kx_list, ky_list, n_cycles=1, initial_strength_d
             # Fallback: compute if not available (shouldn't happen in normal operation)
             current_energy = objective_function(xk, kx_list, ky_list, n_cycles, verbose=False)
             
-        print(f"  Iteration {iteration_count[0]}/{max_iter}: Energy density = {current_energy:.6f}")
+        print(f"  Iteration {iteration_count[0]}/{max_iter}: Energy density = {current_energy:.6f} (Time: {iteration_time:.2f}s)")
+        iteration_start_time[0] = current_time  # Reset for next iteration
         return False
     
     # Perform optimization
@@ -413,6 +434,7 @@ def plot_results(E_diff, optimized_strength_durations, grid_size, title_suffix="
     
     # Use pcolormesh instead of imshow for better coordinate control
     plt.pcolormesh(kx_coords, ky_coords, E_diff)
+    plt.colorbar(label='Energy difference')
     
     # Add training points overlay if requested and this is a test grid
     if show_training_points and grid_size == n_k_points_test:
@@ -443,7 +465,6 @@ def plot_results(E_diff, optimized_strength_durations, grid_size, title_suffix="
                 plt.scatter(kx_coord, ky_coord, c='red', marker='x', s=50, linewidths=2, 
                            label='Training points' if i==0 and j==0 else "")
     
-    plt.colorbar(label='Energy difference')
     plt.xlabel('kx')
     plt.ylabel('ky')
     plt.title(f'Energy difference {title_suffix}(Grid: {grid_size}x{grid_size})')
@@ -517,7 +538,7 @@ def run_simulation_on_grid(kx_list, ky_list, strength_durations, n_cycles=1, gri
     print(f"{grid_name} grid: {grid_size}x{grid_size} = {grid_size**2} points")
     
     # Use helper function to run simulation
-    E_diff, single_particle_dm = run_simulation_over_momentum_grid(kx_list, ky_list, strength_durations, n_cycles, verbose=True)
+    E_diff, single_particle_dm = run_simulation_over_momentum_grid(kx_list, ky_list, strength_durations, n_cycles, verbose=False)
     
     # Calculate Chern numbers
     total_chern_number = get_chern_number_from_single_particle_dm(single_particle_dm)
@@ -552,12 +573,13 @@ def train_variational_circuit():
     print(f"Training grid: {len(kx_list_train)}x{len(ky_list_train)} = {len(kx_list_train)*len(ky_list_train)} points")
     
     # Get initial trotterized evolution parameters
-    initial_strength_durations = trotterized_evolution_parameters()
+    initial_strength_durations = randn_strength_durations()
+    # initial_strength_durations = trotterized_evolution_parameters()
     print(f"Initial strength*duration parameters shape: {[(k, v.shape) for k, v in initial_strength_durations.items()]}")
     
     # Optimize the strength_durations on training data
     optimized_strength_durations, opt_result = optimize_strength_durations(
-        kx_list_train, ky_list_train, 
+        kx_list_train, ky_list_train[ky_list_train >= 0], 
         n_cycles=n_cycles_train,
         initial_strength_durations=initial_strength_durations,
         method='L-BFGS-B'
@@ -597,7 +619,7 @@ def plot_energy_density_vs_cycles(kx_list, ky_list, strength_durations, max_cycl
     
     # Use helper function to run simulation once with max_cycles
     print(f"  Running simulation with {max_cycles} cycles to get energy evolution...")
-    E_diff_all_cycles, _ = run_simulation_over_momentum_grid(kx_list, ky_list, strength_durations, max_cycles, verbose=True)
+    E_diff_all_cycles, _ = run_simulation_over_momentum_grid(kx_list, ky_list, strength_durations, max_cycles, verbose=False)
     
     # Calculate energy densities for each cycle count
     cycle_counts = range(1, max_cycles + 1)
@@ -662,7 +684,7 @@ def main():
     
     # Plot energy density vs cycles
     cycle_counts, energy_densities = plot_energy_density_vs_cycles(
-        kx_list_test, ky_list_test, optimized_strength_durations, max_cycles=20
+        kx_list_test, ky_list_test, optimized_strength_durations, max_cycles=n_cycles_test
     )
 
     # Plot and print results using helper functions

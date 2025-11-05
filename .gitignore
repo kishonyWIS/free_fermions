@@ -1,0 +1,80 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+
+# Data files
+*.npy
+*.npz
+*.pickle
+*.pkl
+
+# Results and output data
+*.csv
+results_*/
+*_results*.csv
+grid_search_results*.csv
+
+# Generated plots and figures
+graphs/
+*.pdf
+*.png
+*.jpg
+*.jpeg
+*.html
+*.svg
+
+# Optimization outputs
+optimized_parameters/
+optimized_strength_durations*.npz
+loss_history.npy
+optimization_history.npy
+
+# Temporary files
+temp.py
+tempp.py
+test.py
+blah.py
+*.tmp
+
+# LaTeX auxiliary files (keep source .tex files)
+*.aux
+*.log
+*.out
+*.toc
+*.synctex.gz
+*.fdb_latexmk
+*.fls
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# Project-specific directories
+KSL_with_noise/graphs/
+KSL_with_noise/pickles/
+KSL_with_noise/old_results/
+before_zero_derivative_parameters_g_B/
+
