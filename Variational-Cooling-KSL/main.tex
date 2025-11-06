@@ -66,14 +66,14 @@ Weizmann Institute of Science,
 Rehovot 76100, Israel}
 
 \begin{abstract}
-We present a variational approach for efficiently preparing the ground state of the chiral phase of the Kitaev spin liquid (KSL) model using shallow-depth quantum circuits. By combining the fermionic cooling approach of Ref.~\cite{Kishony_2025} with the variational optimization strategy of Ref.~\cite{song2025varicoolnonunitaryquantumvariational}, we develop a protocol that replaces the large-depth Trotterized evolution (requiring on the order of 100 steps) with an optimized circuit containing only a few layers. The protocol is trained on small momentum-space grids and demonstrates good transferability to larger system sizes. We systematically explore the performance as a function of circuit depth and training grid resolution, showing that even with $p=5$ layers, the protocol achieves near-optimal cooling performance.
+We present an efficient approach for preparing the ground state of the chiral phase of the Kitaev spin liquid (KSL) model using shallow-depth quantum circuits. By combining the fermionic cooling approach of Ref.~\cite{Kishony_2025} with the variational optimization strategy of Ref.~\cite{song2025varicoolnonunitaryquantumvariational}, we develop a protocol that replaces the large-depth Trotterized evolution (requiring on the order of 100 steps) with an optimized circuit containing only a few layers. The protocol is trained on small momentum-space grids and demonstrates good transferability to larger system sizes. We systematically explore the performance as a function of circuit depth and training grid resolution, showing that even with $p=5$ layers, the protocol achieves a state with a residual energy density below 0.025 in the units of the gap.
 \end{abstract}
 
 \maketitle
 
 \section{Introduction}
 
-The preparation of topologically non-trivial quantum states, particularly chiral states with non-Abelian anyon excitations, remains a central challenge in quantum simulation. The chiral phase of the Kitaev spin liquid (KSL) model on the honeycomb lattice provides an important test case, as it hosts emergent Majorana fermions with a non-zero Chern number that cannot be prepared by finite-depth local unitary circuits from product states~\cite{kitaev2006anyons}.
+The preparation of topologically non-trivial quantum states, particularly chiral states with non-Abelian anyon excitations, remains a central challenge in quantum simulation. The chiral phase of the Kitaev spin liquid (KSL) model~\cite{kitaev2006anyons} on the honeycomb lattice provides an important test case, as it hosts emergent Majorana fermions with a non-zero Chern number and cannot be prepared by finite-depth local unitary circuits from a product state.
 
 Recent work has demonstrated that fermionic cooling protocols can efficiently prepare such states by coupling the system to a simulated fermionic bath~\cite{Kishony_2025}. However, these protocols typically require many Trotter steps (on the order of 100) to achieve adiabatic evolution, making them challenging to implement on near-term quantum hardware. Inspired by variational quantum algorithms such as QAOA~\cite{farhiQAOA} and the Vari-Cool protocol~\cite{Kishony_2025}, we develop a variational approach that compresses the cooling evolution into a shallow-depth circuit with only a few layers while maintaining high fidelity ground state preparation.
 
@@ -88,11 +88,11 @@ H_{\text{KSL}}=&-\sum_{\alpha\in\{x,y,z\}}\mathcal{J}_{\alpha}\sum_{\langle\math
 &-\kappa\sum_{\langle\langle\mathbf{J},\mathbf{K},\mathbf{L}\rangle\rangle}\sigma_{\mathbf{J}}^{x}\sigma_{\mathbf{K}}^{y}\sigma_{\mathbf{L}}^{z},
 \label{eq: KSL}
 \end{align}
-where $\mathbf{J} = (i,j,s)$ denotes sites of the honeycomb lattice with unit cell indices $i,j$ and sublattice $s\in\{A,B\}$, $\sigma_{\mathbf{J}}^\alpha$ are Pauli matrices, $\mathcal{J}_x, \mathcal{J}_y, \mathcal{J}_z$ are the Kitaev exchange couplings, and $\kappa$ is a three-spin interaction that breaks time-reversal symmetry and drives the system into the chiral non-Abelian phase.
+where $\mathbf{J} = (i,j,s)$ denotes sites of the honeycomb lattice with unit cell indices $i,j$ and sublattice $s\in\{A,B\}$, $\sigma_{\mathbf{J}}^\alpha$ are Pauli matrices, and $\kappa$ is a three-spin interaction that breaks time-reversal symmetry and drives the system into the gapped chiral non-Abelian phase. The bonds of the honeycomb lattice are partitioned into three sets -- $x$, $y$, and $z$ bonds -- according to their geometric orientations (see Fig.~\ref{fig:ksl_model}), and the Kitaev exchange couplings $\mathcal{J}_x, \mathcal{J}_y, \mathcal{J}_z$ act on the corresponding bond types.
 
 \subsection{Modified Model for Cooling}
 
-To enable efficient cooling, we introduce a modified KSL Hamiltonian that includes both system ($\sigma$) and auxiliary bath ($\tau$) spins at each site:
+To enable efficient cooling, Ref.~\cite{Kishony_2025} introduces a modified KSL Hamiltonian that includes both system ($\sigma$) and auxiliary bath ($\tau$) spins at each site:
 \begin{align}
 H(t)=\widetilde{H}_{\text{KSL}}+H_{{\rm c}}(t),
 \label{eq:H_KSL}
@@ -103,9 +103,12 @@ where
 &-\kappa\sum_{\langle\langle \mathbf{J},\mathbf{K},\mathbf{L}\rangle\rangle}\sigma_{\mathbf{J}}^x\tau_{\mathbf{J}}^z\sigma_{\mathbf{K}}^y\tau_{\mathbf{K}}^z\sigma_{\mathbf{L}}^z
 \label{eq: KSL with spins}
 \end{align}
-and the control Hamiltonian is
+
+The $\tau^z_{\mathbf{J}}$ operators all commute with $\widetilde{H}_{\rm{KSL}}$. Clearly, $\widetilde{H}_{\text{KSL}}$ is identical to $H_{\text{KSL}}$ in Eq.~\eqref{eq: KSL} in the sector $\tau^z_{\mathbf{J}}=+1$. In fact, the two Hamiltonians are related by a unitary transformation for any state of the $\tau$ spins with even parity, $\prod_{\mathbf{J}} \tau^z_{\mathbf{J}}=1$. To see this, we note that all of the unitary operators $\mathcal{U}_{\mathbf{I},\mathbf{J}} = \tau^x_{\mathbf{I}}\sigma^\alpha_{\mathbf{I}}\sigma^\alpha_{\mathbf{J}}\tau^x_{\mathbf{J}}$, for $\langle \mathbf{I},\mathbf{J}\rangle\in \alpha\text{-bonds}$, commute with $\widetilde{H}_{\rm{KSL}}$ and anticommute individually with $\tau^z_{\mathbf{I}}$ and $\tau^z_{\mathbf{J}}$. The transformation from a sector with a given $\{\tau^z_\mathbf{J}\}$ of even parity to the sector $\tau^z_\mathbf{J}=1$ can be constructed by annihilating pairs of $\tau^z_\mathbf{K},\tau^z_\mathbf{L}=-1$ using a product of the unitaries $\mathcal{U}_{\mathbf{I},\mathbf{J}}$ along a path connecting the points $\mathbf{K}, \mathbf{L}$. Thus, preparing the ground state of $\widetilde{H}_{\rm{KSL}}$ in any known even-parity sector of $\{\tau^z_{\mathbf{J}}\}$ is equivalent to preparing the ground state of the original KSL Hamiltonian, Eq.~\eqref{eq: KSL}.
+
+The control Hamiltonian $H_{{\rm c}}(t)$, which is used to cool into the ground state of $\widetilde{H}_{\text{KSL}}$, is chosen as a time-dependent effective Zeeman field acting on $\tau_{\mathbf{J}}$ with $\hat{x}$ and $\hat{z}$ components:
 \begin{align}
-H_{{\rm c}}(t)=-\sum_{\mathbf{J}}B_{\mathbf{J}}(t)\tau_{\mathbf{J}}^{z}-\sum_{\mathbf{J}}g_{\J}(t)\tau_{\mathbf{J}}^{x}.
+H_{{\rm c}}(t)=-\sum_{\mathbf{J}}B(t)\tau_{\mathbf{J}}^{z}-\sum_{\mathbf{J}}g(t)\tau_{\mathbf{J}}^{x}.
 \label{eq: control hamiltonian}
 \end{align}
 
@@ -121,7 +124,7 @@ The system is illustrated in Fig.~\ref{fig:ksl_model}, showing the honeycomb lat
 
 \subsection{Fermionization and Momentum-Space Description}
 
-Following Ref.~\cite{Kishony_2025}, we fermionize both the system and bath spins, introducing Majorana operators $\{c_{\mathbf{J}}^{x},c_{\mathbf{J}}^{y},c_{\mathbf{J}}^{z},b_{\mathbf{J}}^{x},b_{\mathbf{J}}^{y},b_{\mathbf{J}}^{z}\}$ per site. In the flux-free sector with uniform $\tau^z_{\mathbf{J}}=1$ and a gauge where $u_{\mathbf{I},\mathbf{J}}=1$, the Hamiltonian becomes translationally invariant and can be Fourier transformed to momentum space.
+Following Ref.~\cite{Kishony_2025}, we simulataneously fermionize the system and bath spins, introducing Majorana operators $\{c_{\mathbf{J}}^{x},c_{\mathbf{J}}^{y},c_{\mathbf{J}}^{z},b_{\mathbf{J}}^{x},b_{\mathbf{J}}^{y},b_{\mathbf{J}}^{z}\}$ per site. After fermionization, the Hamiltonian can be expressed in terms of the system fermions $\{c_{\mathbf{J}}^{z}\}$ and the conserved $\mathbb{Z}_2$ gauge fields $\{u_{\mathbf{I},\mathbf{J}}\}$, where $u_{\mathbf{I},\mathbf{J}} = ib_{\mathbf{I}}^{\alpha}b_{\mathbf{J}}^{\alpha}$ for bonds $\langle \mathbf{I},\mathbf{J}\rangle\in \alpha\text{-bonds}$ with $\alpha\in\{x,y,z\}$. The gauge-invariant flux $W_{i,j}$ of the $\mathbb{Z}_2$ gauge field is defined on each hexagonal plaquette corresponding to unit cell $(i,j)$ as the product of $u_{\mathbf{I},\mathbf{J}}$ on its edges. In the flux-free sector with $W_{i,j}=1$ for all plaquettes (equivalent to setting $u_{\mathbf{I},\mathbf{J}}=1$ up to a $\mathbb{Z}_2$ gauge transformation) and with uniform $\tau^z_{\mathbf{J}}=1$, the Hamiltonian becomes translationally invariant and can be Fourier transformed to momentum space.
 
 The fermionic Hamiltonian in momentum space is:
 \begin{align}
@@ -137,8 +140,8 @@ c_{(\bm{k},B)}^{x\dagger}
 and the $6 \times 6$ Hamiltonian matrix at each $\bm{k}$ is:
 \begin{align}
 H_{\bm{k}}(t)=\left(\begin{array}{ccc}
-h_{\bm{k}} & G(t) & 0\\
-G^{\dagger}(t) & 0 & -iB(t)\mathbb{I}\\
+h_{\bm{k}} & -ig(t)\mathbb{I} & 0\\
+ig(t)\mathbb{I} & 0 & -iB(t)\mathbb{I}\\
 0 & iB(t)\mathbb{I} & 0
 \end{array}\right).
 \label{eq:Hk}
@@ -157,21 +160,15 @@ where
 f(\bm{k})&=\mathcal{J}_{x}+\mathcal{J}_{y}e^{-ik_{x}}+\mathcal{J}_{z}e^{-ik_{y}}.
 \end{align}
 
-The $2 \times 2$ matrix $G(t)$ describes hopping between system and bath fermions:
-\begin{align}
-G(t)=\begin{pmatrix} -ig(t)\Gamma_A & 0\\
-0 & -ig(t)\Gamma_B
-\end{pmatrix},
-\end{align}
-where we use $\Gamma_A=\Gamma_B=1$ corresponding to two cooling sublattices.
 
-The key advantage of this momentum-space description is that different $\bm{k}$ points are decoupled, allowing us to analyze and optimize the cooling protocol independently at each momentum point.
+The key advantage of this momentum-space description is that different $\bm{k}$ points are decoupled, allowing us to analyze the cooling protocol independently at each momentum point.
 
 \section{Variational Circuit}
 
 \subsection{Circuit Structure}
 
-Rather than implementing the full continuous-time adiabatic evolution through many Trotter steps, we design a variational circuit with $p$ layers, where each layer applies unitary gates corresponding to the different terms in the Hamiltonian. The circuit unitary for a single cooling cycle is constructed as a product of $p$ layers:
+In each cooling cycle, Ref.~\cite{Kishony_2025} implements a continuous-time evolution during which $g(t)$ and $B(t)$ are adiabatically varied in order to extract energy and entropy from the system to the bath through many Trotter steps. Here, we replace this adiabatic evolution with a shallow-depth variational circuit with $p$ layers, where each layer applies unitary gates corresponding to the different terms in the Hamiltonian:
+
 \begin{align}
 U_{\text{cycle}} = \prod_{\ell=1}^{p} U_\ell,
 \end{align}
