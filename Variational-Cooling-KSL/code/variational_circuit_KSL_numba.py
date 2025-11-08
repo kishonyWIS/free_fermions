@@ -1277,7 +1277,7 @@ def run_progressive_circuit_expansion(output_csv=None, params_output_dir=None,
                     # First p value for this res - always use trotterized initialization
                     print(f"  Starting with trotterized initialization (first p={p_val} for res={res})")
                     # initial_params = None  # Will trigger trotterized initialization in run_single_experiment
-                    initial_params, _, _, _ = find_best_initialization(kx_list_train, ky_list_train, n_random_trials=100, n_cycles_eval=n_cycles_train, std=1.0, require_monotonic=True)
+                    initial_params, _, _, _ = find_best_initialization(kx_list_train, ky_list_train, n_random_trials=100, n_cycles_eval=n_cycles_train, std=1.0, require_monotonic=False)
                 
                 energy_density_train, energy_density_test, optimized_strength_durations = run_single_experiment(
                     p_val, kx_list_train, ky_list_train, kx_list_test, ky_list_test, initial_strength_durations=initial_params
