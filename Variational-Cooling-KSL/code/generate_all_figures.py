@@ -57,13 +57,13 @@ def plot_energy_vs_cycles(res_val=3, p_val=5, max_cycles=20):
     vc_module.p = p_val
     
     # Create grids
-    n_k_points_train = 1 + 6 * res_val
-    n_k_points_test = 1 + 6 * 20  # 121
+    n_k_points_train = 6 * res_val
+    n_k_points_test = 6 * 20  # 120
     
-    kx_list_train = np.linspace(-np.pi, np.pi, n_k_points_train)
-    ky_list_train = np.linspace(-np.pi, np.pi, n_k_points_train)
-    kx_list_test = np.linspace(-np.pi, np.pi, n_k_points_test)
-    ky_list_test = np.linspace(-np.pi, np.pi, n_k_points_test)
+    kx_list_train = np.linspace(-np.pi, np.pi, n_k_points_train + 1)[:-1]
+    ky_list_train = np.linspace(-np.pi, np.pi, n_k_points_train + 1)[:-1]
+    kx_list_test = np.linspace(-np.pi, np.pi, n_k_points_test + 1)[:-1]
+    ky_list_test = np.linspace(-np.pi, np.pi, n_k_points_test + 1)[:-1]
     
     # Run simulation for training grid
     print(f"  Running simulation on training grid ({n_k_points_train}x{n_k_points_train}) with {max_cycles} cycles...")
@@ -92,15 +92,18 @@ def plot_energy_vs_cycles(res_val=3, p_val=5, max_cycles=20):
     # Create the plot
     plt.figure(figsize=(8, 6))
     plt.plot(cycle_counts, energy_densities_train, 'b-o', linewidth=2, markersize=6, 
-             label=f'Training Grid ({n_k_points_train}x{n_k_points_train})')
+             label=f'Train')
     plt.plot(cycle_counts, energy_densities_test, 'r-s', linewidth=2, markersize=6, 
-             label=f'Test Grid ({n_k_points_test}x{n_k_points_test})')
+             label=f'Test')
     
-    plt.xlabel('Number of Cooling Cycles', fontsize=12)
-    plt.ylabel('Energy Density', fontsize=12)
-    plt.title(f'Energy Density vs. Number of Cooling Cycles\n(res={res_val}, p={p_val})', fontsize=12)
+    # set x ticks according to the data and add labels only for every 5th tick
+    plt.xticks(np.arange(0, max_cycles+1, 5)[1:])
+    plt.ylim(0, max(energy_densities_train + energy_densities_test)*1.05)
+    plt.xlabel('Cycle number', fontsize=20)
+    plt.ylabel('Energy Density', fontsize=20)
     plt.grid(True, alpha=0.3)
-    plt.legend(fontsize=10)
+    plt.legend(fontsize=17)
+    plt.tick_params(labelsize=17)
     plt.tight_layout()
     
     # Save figure
@@ -110,16 +113,18 @@ def plot_energy_vs_cycles(res_val=3, p_val=5, max_cycles=20):
     plt.close()
 
 
-def plot_energy_heatmap_train(res_val=3, p_val=5):
+def plot_energy_heatmap(res_val=3, p_val=5, grid_type='train'):
     """
-    Generate energy_heatmap_train.pdf - Energy difference heatmap on training grid
+    Generate energy heatmap - Energy difference heatmap on training or test grid
     
     Args:
         res_val: resolution parameter
         p_val: number of layers
+        grid_type: 'train' or 'test' - determines which grid to use
     """
+    grid_name = 'train' if grid_type == 'train' else 'test'
     print(f"\n{'='*60}")
-    print("Generating energy_heatmap_train.pdf")
+    print(f"Generating energy_heatmap_{grid_name}.pdf")
     print(f"{'='*60}")
     
     # Load parameters
@@ -129,15 +134,25 @@ def plot_energy_heatmap_train(res_val=3, p_val=5):
     import variational_circuit_KSL_numba as vc_module
     vc_module.p = p_val
     
-    # Create training grid
-    n_k_points_train = 1 + 6 * res_val
-    kx_list_train = np.linspace(-np.pi, np.pi, n_k_points_train)
-    ky_list_train = np.linspace(-np.pi, np.pi, n_k_points_train)
+    # Determine grid size and cycles based on grid type
+    if grid_type == 'train':
+        n_k_points = 6 * res_val
+        n_cycles = n_cycles_train
+        show_training_points = False
+    else:  # test
+        n_k_points = 6 * 20  # 120
+        n_cycles = n_cycles_test
+        show_training_points = True
+        n_k_points_train = 6 * res_val
+    
+    # Create grid
+    kx_list = np.linspace(-np.pi, np.pi, n_k_points + 1)[:-1]
+    ky_list = np.linspace(-np.pi, np.pi, n_k_points + 1)[:-1]
     
     # Run simulation
-    print(f"  Running simulation on training grid ({n_k_points_train}x{n_k_points_train})...")
+    print(f"  Running simulation on {grid_name} grid ({n_k_points}x{n_k_points})...")
     E_diff, _, _, _, _, _ = simulate_grid_with_analysis(
-        kx_list_train, ky_list_train, strength_durations, n_cycles=n_cycles_train
+        kx_list, ky_list, strength_durations, n_cycles=n_cycles
     )
     
     # Extract final cycle if multiple cycles
@@ -149,99 +164,53 @@ def plot_energy_heatmap_train(res_val=3, p_val=5):
     # Create plot
     plt.figure(figsize=(8, 7))
     
-    kx_coords = np.linspace(-np.pi, np.pi, n_k_points_train)
-    ky_coords = np.linspace(-np.pi, np.pi, n_k_points_train)
+    kx_coords = np.linspace(-np.pi, np.pi, n_k_points + 1)[:-1]
+    ky_coords = np.linspace(-np.pi, np.pi, n_k_points + 1)[:-1]
     
     vmin = 0.0
     vmax = np.max(E_diff_plot)
     im = plt.pcolormesh(kx_coords, ky_coords, E_diff_plot, vmin=vmin, vmax=vmax, shading='auto')
-    plt.colorbar(im, label='Energy difference', shrink=0.8)
+    cbar = plt.colorbar(im, shrink=0.8)
+    cbar.set_label('Energy difference', fontsize=20)
+    cbar.ax.tick_params(labelsize=17)
     
-    plt.xlabel('$k_x$', fontsize=12)
-    plt.ylabel('$k_y$', fontsize=12)
-    plt.title(f'Energy Difference Heatmap - Training Grid\n(res={res_val}, p={p_val}, {n_k_points_train}$\\times${n_k_points_train} points)', fontsize=12)
+    # Mark training points if this is test grid
+    if show_training_points:
+        step = (n_k_points - 1) / (n_k_points_train - 1)
+        training_indices = np.round(np.arange(0, n_k_points, step)).astype(int)
+        training_indices = training_indices[:n_k_points_train]
+        
+        kx_train_coords = kx_coords[training_indices]
+        ky_train_coords = ky_coords[training_indices]
+        
+        for i, kx_coord in enumerate(kx_train_coords):
+            for j, ky_coord in enumerate(ky_train_coords):
+                plt.scatter(kx_coord, ky_coord, c='red', marker='x', s=50, linewidths=2, 
+                           label='Training points' if i==0 and j==0 else "")
+    
+    plt.xlabel('$k_x$', fontsize=20)
+    plt.ylabel('$k_y$', fontsize=20)
+    if show_training_points:
+        plt.legend(fontsize=17)
+    plt.tick_params(labelsize=17)
+    plt.axis('square')
     plt.tight_layout()
     
     # Save figure
-    fig_path = os.path.join(FIGURES_DIR, 'energy_heatmap_train.pdf')
+    fig_path = os.path.join(FIGURES_DIR, f'energy_heatmap_{grid_name}.pdf')
     plt.savefig(fig_path, dpi=300, bbox_inches='tight')
     print(f"  Saved to {fig_path}")
     plt.close()
+
+
+def plot_energy_heatmap_train(res_val=3, p_val=5):
+    """Wrapper for backward compatibility"""
+    plot_energy_heatmap(res_val, p_val, grid_type='train')
 
 
 def plot_energy_heatmap_test(res_val=3, p_val=5):
-    """
-    Generate energy_heatmap_test.pdf - Energy difference heatmap on test grid with training points marked
-    
-    Args:
-        res_val: resolution parameter
-        p_val: number of layers
-    """
-    print(f"\n{'='*60}")
-    print("Generating energy_heatmap_test.pdf")
-    print(f"{'='*60}")
-    
-    # Load parameters
-    strength_durations = load_optimized_parameters_for_res_p(res_val, p_val)
-    
-    # Set global p
-    import variational_circuit_KSL_numba as vc_module
-    vc_module.p = p_val
-    
-    # Create grids
-    n_k_points_train = 1 + 6 * res_val
-    n_k_points_test = 1 + 6 * 20  # 121
-    
-    kx_list_test = np.linspace(-np.pi, np.pi, n_k_points_test)
-    ky_list_test = np.linspace(-np.pi, np.pi, n_k_points_test)
-    
-    # Run simulation
-    print(f"  Running simulation on test grid ({n_k_points_test}x{n_k_points_test})...")
-    E_diff, _, _, _, _, _ = simulate_grid_with_analysis(
-        kx_list_test, ky_list_test, strength_durations, n_cycles=n_cycles_test
-    )
-    
-    # Extract final cycle if multiple cycles
-    if E_diff.ndim == 3:
-        E_diff_plot = E_diff[-1, :, :]
-    else:
-        E_diff_plot = E_diff
-    
-    # Create plot
-    plt.figure(figsize=(8, 7))
-    
-    kx_coords = np.linspace(-np.pi, np.pi, n_k_points_test)
-    ky_coords = np.linspace(-np.pi, np.pi, n_k_points_test)
-    
-    vmin = 0.0
-    vmax = np.max(E_diff_plot)
-    im = plt.pcolormesh(kx_coords, ky_coords, E_diff_plot, vmin=vmin, vmax=vmax, shading='auto')
-    plt.colorbar(im, label='Energy difference', shrink=0.8)
-    
-    # Mark training points
-    step = (n_k_points_test - 1) / (n_k_points_train - 1)
-    training_indices = np.round(np.arange(0, n_k_points_test, step)).astype(int)
-    training_indices = training_indices[:n_k_points_train]
-    
-    kx_train_coords = kx_coords[training_indices]
-    ky_train_coords = ky_coords[training_indices]
-    
-    for i, kx_coord in enumerate(kx_train_coords):
-        for j, ky_coord in enumerate(ky_train_coords):
-            plt.scatter(kx_coord, ky_coord, c='red', marker='x', s=50, linewidths=2, 
-                       label='Training points' if i==0 and j==0 else "")
-    
-    plt.xlabel('$k_x$', fontsize=12)
-    plt.ylabel('$k_y$', fontsize=12)
-    plt.title(f'Energy Difference Heatmap - Test Grid\n(res={res_val}, p={p_val}, {n_k_points_test}$\\times${n_k_points_test} points)', fontsize=12)
-    plt.legend(fontsize=10)
-    plt.tight_layout()
-    
-    # Save figure
-    fig_path = os.path.join(FIGURES_DIR, 'energy_heatmap_test.pdf')
-    plt.savefig(fig_path, dpi=300, bbox_inches='tight')
-    print(f"  Saved to {fig_path}")
-    plt.close()
+    """Wrapper for backward compatibility"""
+    plot_energy_heatmap(res_val, p_val, grid_type='test')
 
 
 def plot_parameters_vs_layer(res_val=3, p_val=5):
@@ -263,8 +232,8 @@ def plot_parameters_vs_layer(res_val=3, p_val=5):
     plt.figure(figsize=(10, 6))
     
     terms = ['Jx', 'Jy', 'Jz', 'kappa', 'g', 'B']
-    labels = ['$\\alpha_x$ (Jx)', '$\\alpha_y$ (Jy)', '$\\alpha_z$ (Jz)', 
-              '$\\beta$ ($\\kappa$)', '$\\gamma$ (g)', '$\\delta$ (B)']
+    labels = ['$\\alpha_{x,\\ell}$ (Jx)', '$\\alpha_{y,\\ell}$ (Jy)', '$\\alpha_{z,\\ell}$ (Jz)', 
+              '$\\delta_\\ell$ ($\\kappa$)', '$\\gamma_\\ell$ (g)', '$\\beta_\\ell$ (B)']
     colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b']
     linestyles = ['-', '-', '-', '-', '-', '-']
     
@@ -272,10 +241,12 @@ def plot_parameters_vs_layer(res_val=3, p_val=5):
         plt.plot(range(1, p_val + 1), strength_durations[term], 
                 label=label, marker='o', linewidth=2, markersize=6, color=color, linestyle=ls)
     
-    plt.xlabel('Layer $\\ell$', fontsize=12)
-    plt.ylabel('Strength $\\times$ Duration', fontsize=12)
-    plt.title(f'Optimized Variational Parameters vs. Layer Number\n(res={res_val}, p={p_val})', fontsize=12)
-    plt.legend(fontsize=10, ncol=2)
+    # set x ticks according to the data
+    plt.xticks(np.arange(1, p_val + 1))
+    plt.xlabel('Layer number $\\ell$', fontsize=24)
+    plt.ylabel('Parameter value', fontsize=24)
+    plt.legend(fontsize=20, ncol=2)
+    plt.tick_params(labelsize=20)
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
     
@@ -286,7 +257,7 @@ def plot_parameters_vs_layer(res_val=3, p_val=5):
     plt.close()
 
 
-def main(res_val=3, p_val=5):
+def main(res_val, p_val):
     """
     Generate all figures for the LaTeX document
     

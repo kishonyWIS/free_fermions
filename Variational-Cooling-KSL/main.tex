@@ -235,7 +235,7 @@ The goals of training are to optimize the circuit's parameters to:
 
 Keeping the numbers of required layers and cycles small is particularly important for implementation on NISQ hardware, where errors can build up for large depth circuits. The non-unitary protocol exhibits an inherent robustness to noise through transfer and elimination of excitations through the bath qubits; the steady state is most resilient to hardware noise when cooling is rapid and the depth $p$ of each unitary block is small.
 
-\subsection{Loss Function and Parameter Optimization}
+\subsection{Loss Function}
 
 For computational efficiency, we train the protocol on a small system of size $L_{\text{train}} \times L_{\text{train}}$ unit cells. Later, we evaluate the performance of the trained circuit a larger system of size $L_{\text{test}} \times L_{\text{test}}$ unit cells.
 
@@ -245,16 +245,14 @@ The loss function for training is computed as follows. For each momentum point $
 \end{align}
 where $E_0(\bm{k})$ is the ground state energy at momentum point $\bm{k}$, and the factor of $1/2$ accounts for the fact that we count both $\bm{k}$ and $-\bm{k}$ in our summation over the full Brillouin zone. The RMS loss is chosen because it penalizes large energy deviations more strongly than the mean absolute error, ensuring that the protocol performs well across the entire Brillouin zone rather than just on average.
 
-The optimization of the circuit parameters for a given circuit depth $p$ is performed using the L-BFGS-B method from SciPy.
-
 \subsection{Progressive Circuit Expansion}
 
 A key strategy in our training approach is the progressive expansion of the circuit depth. Direct optimization of parameters for a target circuit depth $p$ can be challenging due to barren plateaus~\cite{Cerezo2021} and local minima in the optimization landscape. Instead, we start with a small circuit depth $p_{\min}$ and progressively expand the circuit depth to $p$ by inserting new layers. This provides a warm start that typically leads to better convergence than random initialization.
 
 \begin{enumerate}
-\item For the smallest $p$ value ($p_{\min}$), we initialize parameters using randomized initialization. Specifically, we test many random initializations (typically 100) and select the one with the lowest steady state energy density that also exhibits monotonic energy decrease over the first few cycles.
+\item For the smallest $p$ value ($p_{\min}$), we use a global optimization method (basin hopping) to avoid getting trapped in local minima. This global optimizer explores the parameter space more thoroughly and is appropriate for the smallest circuit depth where the parameter space is small.
 \item For each subsequent $p > p_{\min}$, we expand the previous optimized circuit by inserting a new layer of gates with zero-valued parameters in the middle of the previous layers. This provides a warm start that typically leads to better convergence than random initialization at the larger circuit depth.
-\item The expanded circuit is then re-optimized, allowing the newly inserted layers to develop non-zero values as needed.
+\item The expanded circuit is then re-optimized using a local optimization method (the L-BFGS-B method from SciPy), allowing the newly inserted layers to develop non-zero values as needed. The warm start from the expanded circuit makes local optimization effective for these larger circuit depths.
 \end{enumerate}
 
 This approach, allows us to systematically explore increasing circuit depths while leveraging the optimization work done at smaller depths.
@@ -267,7 +265,7 @@ This approach, allows us to systematically explore increasing circuit depths whi
 \begin{centering}
 \includegraphics[width=(\textwidth-\columnsep)/2]{figures/energy_vs_p_by_res.pdf}
 \par\end{centering}
-\caption{\textbf{Energy density vs. circuit depth $p$ for different training system sizes.} Solid lines show test grid performance, dashed lines show training grid performance. Results are shown for training system size $n_{\text{k,train}} = 19$ (primary focus) and other system sizes. The protocol achieves near-optimal performance even with $p=3$ layers.}
+\caption{\textbf{Energy density vs. circuit depth $p$ for different training system sizes.} Solid lines show test grid performance, dashed lines show training grid performance. Results are shown for training system with $L_{\text{train}} = 18$ (primary focus) and other system sizes. The protocol achieves near-optimal performance even with $p=3$ layers.}
 \label{fig:energy_vs_p}
 \end{figure}
 
@@ -280,17 +278,15 @@ To probe the convergence to the ground state, we define the finite size version 
 \label{eq:eta}
 \nu = \frac{1}{2\pi i}\int \Tr{R\left[\partial_{k_x}R,\partial_{k_y}R\right]}dk_xdk_y,
 \end{align}
-where $R$ is the single-particle density matrix of the system fermions. Specifically, $R_{s,s'}(\bm{k})=\left\langle c_{(\bm{k},s)}^{z\dagger} c_{(\bm{k},s')}^{z}\right\rangle$, where $c_{(\bm{k},s)}^{z}$ is the Fourier transform of the system fermion operators on sublattice $s$ with wavevector $\bm{k}$. In a pure Slater determinant state, this quantity becomes the integrated Chern density. We calculate this value by performing a discrete integral in momentum space.
+where $R$ is the single-particle density matrix of the system fermions, $R_{s,s'}(\bm{k})=\left\langle c_{(\bm{k},s)}^{z\dagger} c_{(\bm{k},s')}^{z}\right\rangle$. In a pure Slater determinant state, this quantity becomes the integrated Chern density. We calculate this value by performing a discrete integral in momentum space. Fig.~\ref{fig:chern_vs_p} shows the finite size spectral Chern number $\nu$ of the prepared steady state as a function of circuit depth. As the circuit depth increases, the steady state value of the Chern number rapidly approaches $\nu=1$.
 
 \begin{figure}
 \begin{centering}
 \includegraphics[width=(\textwidth-\columnsep)/2]{figures/chern_vs_p.pdf}
 \par\end{centering}
-\caption{\textbf{Finite size spectral Chern number $\nu$ vs. circuit depth $p$ for different training system sizes.} Solid lines show test grid performance, dashed lines show training grid performance. The target value is $\nu=1$ for the system fermions. Results are shown for training system size $n_{\text{k,train}} = 19$ (primary focus) and other system sizes. The protocol successfully prepares states with the correct topological invariant even with shallow circuits.}
+\caption{\textbf{Finite size spectral Chern number $\nu$ vs. circuit depth $p$ for different training system sizes.} Solid lines show test grid performance, dashed lines show training grid performance. The target value is $\nu=1$ for the system fermions. Results are shown for training system with $L_{\text{train}} = 18$ (primary focus) and other system sizes. The protocol successfully prepares states with the correct topological invariant even with shallow circuits.}
 \label{fig:chern_vs_p}
 \end{figure}
-
-Fig.~\ref{fig:chern_vs_p} shows the finite size spectral Chern number $\nu$ of the prepared state as a function of circuit depth. The protocol successfully prepares states with the correct topological invariant ($\nu=1$ for system) even with shallow circuits, confirming that the topological properties are preserved despite the compression from the original Trotterized protocol.
 
 \subsection{Energy Convergence vs. Cycles}
 
@@ -298,11 +294,11 @@ Fig.~\ref{fig:chern_vs_p} shows the finite size spectral Chern number $\nu$ of t
 \begin{centering}
 \includegraphics[width=(\textwidth-\columnsep)/2]{figures/energy_vs_cycles.pdf}
 \par\end{centering}
-\caption{\textbf{Energy density vs. number of cooling cycles for trained circuit with training system size $n_{\text{k,train}} = 19$, $p=5$.} Results are shown for both training grid (blue) and test grid (red). The protocol converges to a steady state within a few cycles.}
+\caption{\textbf{Energy density vs. number of cooling cycles for trained circuit with $L_{\text{train}} = 18$, $p=5$.} Results are shown for both training system size (blue) and test system size (red). The protocol converges to a steady state within a few cycles.}
 \label{fig:energy_vs_cycles}
 \end{figure}
 
-Fig.~\ref{fig:energy_vs_cycles} demonstrates the convergence of the energy density as a function of the number of cooling cycles. The protocol rapidly approaches its steady state, with most of the cooling occurring within the first few cycles.
+Fig.~\ref{fig:energy_vs_cycles} demonstrates the convergence of the energy density as a function of the number of cooling cycles. The protocol rapidly approaches its steady state, with most of the cooling occurring within the first cycle.
 
 \subsection{Energy Heatmaps}
 
@@ -310,7 +306,7 @@ Fig.~\ref{fig:energy_vs_cycles} demonstrates the convergence of the energy densi
 \begin{centering}
 \includegraphics[width=(\textwidth-\columnsep)/2]{figures/energy_heatmap_train.pdf}
 \par\end{centering}
-\caption{\textbf{Energy difference heatmap on the training grid ($19 \times 19$ points) for optimized circuit with training system size $n_{\text{k,train}} = 19$, $p=5$.} The color scale shows the energy difference from the ground state at each momentum point.}
+\caption{\textbf{Energy difference heatmap on the training grid for optimized circuit with $L_{\text{train}} = 18$, $p=5$.} The color scale shows the energy difference from the ground state at each momentum point.}
 \label{fig:energy_heatmap_train}
 \end{figure}
 
@@ -318,11 +314,11 @@ Fig.~\ref{fig:energy_vs_cycles} demonstrates the convergence of the energy densi
 \begin{centering}
 \includegraphics[width=(\textwidth-\columnsep)/2]{figures/energy_heatmap_test.pdf}
 \par\end{centering}
-\caption{\textbf{Energy difference heatmap on the test grid ($121 \times 121$ points) for optimized circuit with training system size $n_{\text{k,train}} = 19$, $p=5$.} Red crosses indicate the training grid points for comparison.}
+\caption{\textbf{Energy difference heatmap on the test grid for optimized circuit with $L_{\text{train}} = 18$, $p=5$.} Red crosses indicate the training grid points for comparison.}
 \label{fig:energy_heatmap_test}
 \end{figure}
 
-Fig.s~\ref{fig:energy_heatmap_train} and~\ref{fig:energy_heatmap_test} show the spatial distribution of energy differences in momentum space on the training and test grids, respectively. The protocol successfully cools the system across the entire Brillouin zone, with only small residual excitations remaining.
+Fig.~\ref{fig:energy_heatmap_train} and Fig.~\ref{fig:energy_heatmap_test} show the distribution of energy differences in momentum space on the training and test grids, respectively. The protocol successfully cools the system across the entire Brillouin zone, with only small residual excitations remaining.
 
 \subsection{Optimized Parameters}
 
@@ -330,25 +326,15 @@ Fig.s~\ref{fig:energy_heatmap_train} and~\ref{fig:energy_heatmap_test} show the 
 \begin{centering}
 \includegraphics[width=(\textwidth-\columnsep)/2]{figures/parameters_vs_layer.pdf}
 \par\end{centering}
-\caption{\textbf{Optimized variational parameters vs. layer number $\ell$ for circuit with training system size $n_{\text{k,train}} = 19$, $p=5$.} Different colors represent different parameter types: $\alpha_x$ (Jx), $\alpha_y$ (Jy), $\alpha_z$ (Jz), $\beta$ (B), $\gamma$ (g), and $\delta$ (kappa).}
+\caption{\textbf{Optimized variational parameters vs. layer number $\ell$ for circuit with $L_{\text{train}} = 18$, $p=5$.} Different colors represent different parameter types: $\alpha_{x,\ell}$ (Jx), $\alpha_{y,\ell}$ (Jy), $\alpha_{z,\ell}$ (Jz), $\beta_\ell$ (B), $\gamma_\ell$ (g), and $\delta_\ell$ (kappa), where $\ell = 1, \ldots, p$ indexes the layers.}
 \label{fig:parameters_vs_layer}
 \end{figure}
 
-Fig.~\ref{fig:parameters_vs_layer} displays the optimized variational parameters as a function of layer index. The parameters show a structured pattern that deviates from the naive Trotterized initialization, indicating that the optimization discovers non-trivial cooling pathways.
+Fig.~\ref{fig:parameters_vs_layer} displays the optimized variational parameters as a function of layer index.
 
 \section{Discussion}
 
 Our results demonstrate that variational optimization can dramatically compress the depth of fermionic cooling circuits while maintaining high fidelity ground state preparation. The key insights are:
-
-\begin{itemize}
-\item \textbf{Shallow depth sufficiency:} Even with $p=3$ layers, the protocol achieves near-optimal performance, representing a $\sim 30\times$ compression compared to the original Trotterized protocol with $\sim 100$ steps.
-
-\item \textbf{Transferability:} Circuits trained on small training system sizes ($n_{\text{k,train}} = 19$, corresponding to $19 \times 19$ points) generalize well to larger testing system sizes ($n_{\text{k,test}} = 121$, corresponding to $121 \times 121$ points), indicating that the optimization captures the essential physics of the cooling process.
-
-\item \textbf{Progressive expansion:} The strategy of progressively expanding circuit depth by inserting zero layers provides warm starts that improve optimization efficiency and convergence.
-
-\item \textbf{Topological preservation:} The optimized circuits successfully prepare states with the correct finite size spectral Chern number ($\nu=1$), confirming that topological properties are preserved despite the compression.
-\end{itemize}
 
 Future directions include extending this approach to interacting fermionic systems, exploring different circuit ansätze, and investigating the performance on quantum hardware with noise.
 

@@ -1,7 +1,7 @@
 from itertools import product
 import numpy as np
 from matplotlib import pyplot as plt
-from scipy.optimize import minimize
+from scipy.optimize import minimize, basinhopping
 import numba
 from numba import jit, complex128, float64, int32
 import time
@@ -44,8 +44,8 @@ smoothed_B = lambda tt: get_B(tt, B0, B1, T) #lambda tt: 0#
 
 # Variational circuit parameters
 p = 5  # Number of layers in the variational circuit
-n_k_points_train = 1 + 6*3  # Training grid size
-n_k_points_test = 1 + 6*20   # Testing grid size
+n_k_points_train = 6*3  # Training grid size
+n_k_points_test = 6*20   # Testing grid size
 
 # Cooling cycle parameters
 n_cycles_train = 5    # Number of cooling cycles for training
@@ -519,7 +519,7 @@ def objective_function(vector, kx_list, ky_list, n_cycles=1, verbose=False):
 
 def optimize_strength_durations(kx_list, ky_list, n_cycles=1, initial_strength_durations=None, method='L-BFGS-B'):
     """
-    Optimize strength_durations to minimize energy density
+    Optimize strength_durations to minimize energy density (local optimization)
     
     Args:
         kx_list, ky_list: momentum space grid
@@ -531,7 +531,7 @@ def optimize_strength_durations(kx_list, ky_list, n_cycles=1, initial_strength_d
         optimized_strength_durations: dictionary with optimized parameters
         optimization_result: scipy optimization result
     """
-    print("Starting optimization...")
+    print("Starting local optimization...")
     
     assert initial_strength_durations is not None
     
@@ -610,6 +610,105 @@ def optimize_strength_durations(kx_list, ky_list, n_cycles=1, initial_strength_d
     return optimized_strength_durations, result
 
 
+def optimize_strength_durations_global(kx_list, ky_list, n_cycles=1, niter=None, T=1.0, stepsize=0.5):
+    """
+    Optimize strength_durations to minimize energy density using global optimization (basin hopping)
+    
+    Args:
+        kx_list, ky_list: momentum space grid
+        n_cycles: number of cooling cycles to perform
+        niter: number of basin hopping iterations (if None, uses epochs)
+        T: temperature parameter for basin hopping (default: 1.0)
+        stepsize: maximum step size for random displacement (default: 0.5)
+    
+    Returns:
+        optimized_strength_durations: dictionary with optimized parameters
+        optimization_result: scipy optimization result
+    """
+    print("Starting global optimization (basin hopping)...")
+    
+    global p
+    
+    # Determine number of parameters
+    num_params = 6 * p  # 6 parameter types (Jx, Jy, Jz, kappa, g, B) × p layers
+    
+    x0 = np.zeros(num_params)
+    
+    print(f"Optimizing {num_params} parameters using basin hopping (unconstrained)")
+    print(f"Number of iterations: {niter}, Temperature: {T}, Step size: {stepsize}")
+    
+    # Create a wrapper class to track function evaluations efficiently
+    class ObjectiveWrapper:
+        def __init__(self, func, kx_list, ky_list, n_cycles):
+            self.func = func
+            self.kx_list = kx_list
+            self.ky_list = ky_list
+            self.n_cycles = n_cycles
+            self.eval_count = 0
+            self.best_value = float('inf')
+            self.best_x = None
+            
+        def __call__(self, x):
+            self.eval_count += 1
+            value = self.func(x, self.kx_list, self.ky_list, self.n_cycles, verbose=False)
+            if value < self.best_value:
+                self.best_value = value
+                self.best_x = x.copy()
+            return value
+    
+    # Create wrapper
+    obj_wrapper = ObjectiveWrapper(objective_function, kx_list, ky_list, n_cycles)
+    iteration_count = [0]
+    iteration_start_time = [time.time()]
+    
+    def callback(x, f, accept):
+        """
+        Callback function for basinhopping
+        Receives (x, f, accept) where x is current coordinates, f is function value, 
+        and accept is whether the step was accepted
+        """
+        iteration_count[0] += 1
+        current_time = time.time()
+        iteration_time = current_time - iteration_start_time[0]
+        
+        # Get current best value from wrapper
+        current_energy = obj_wrapper.best_value
+        
+        status = "accepted" if accept else "rejected"
+        print(f"  Iteration {iteration_count[0]}/{niter}: Best energy density = {current_energy:.6f}, "
+              f"Current = {f:.6f} ({status}) (Time: {iteration_time:.2f}s, Evals: {obj_wrapper.eval_count})")
+        iteration_start_time[0] = current_time  # Reset for next iteration
+    
+    # Set up local minimizer options (unconstrained - using BFGS instead of L-BFGS-B)
+    minimizer_kwargs = {
+        "method": "BFGS",
+        "options": {"maxiter": 100, "ftol": 1e-6}
+    }
+    
+    # Perform global optimization using basin hopping
+    # Note: Reproducibility is ensured by np.random.seed(42) set before generating x0
+    result = basinhopping(
+        obj_wrapper,
+        x0=x0,
+        niter=niter,
+        T=T,
+        stepsize=stepsize,
+        minimizer_kwargs=minimizer_kwargs,
+        callback=callback
+    )
+    
+    # Convert result back to strength_durations
+    optimized_strength_durations = vector_to_strength_durations(result.x)
+    
+    print(f"Global optimization completed!")
+    print(f"Final energy density: {result.fun:.6f}")
+    print(f"Function evaluations: {result.nfev}")
+    print(f"Total objective function calls: {obj_wrapper.eval_count}")
+    print(f"Number of local minimizations: {result.nit}")
+    
+    return optimized_strength_durations, result
+
+
 # ===== I/O Functions =====
 
 def save_optimized_parameters_for_res_p(strength_durations, res, p, output_dir=None):
@@ -682,7 +781,7 @@ def evaluate_loaded_parameters(res_val, p_val, parameter_file=None, input_dir=No
     Load circuit parameters from a file and evaluate them on training and test grids
     
     Args:
-        res_val: resolution parameter (n_k_points_train = 1 + 6*res_val)
+        res_val: resolution parameter (n_k_points_train = 6*res_val)
         p_val: number of layers in the circuit
         parameter_file: full path to parameter file (if None, uses load_optimized_parameters_for_res_p)
         input_dir: directory containing saved parameters (used if parameter_file is None)
@@ -724,7 +823,7 @@ def evaluate_loaded_parameters(res_val, p_val, parameter_file=None, input_dir=No
     try:
         # Set new parameters
         p = p_val
-        n_k_points_train = 1 + 6 * res_val
+        n_k_points_train = 6 * res_val
         if n_k_points_test_fixed is None:
             n_k_points_test_fixed = n_k_points_test
         else:
@@ -746,8 +845,8 @@ def evaluate_loaded_parameters(res_val, p_val, parameter_file=None, input_dir=No
         print(f"{'='*60}")
         
         # Create training momentum space grid
-        kx_list_train = np.linspace(-np.pi, np.pi, n_k_points_train)
-        ky_list_train = np.linspace(-np.pi, np.pi, n_k_points_train)
+        kx_list_train = np.linspace(-np.pi, np.pi, n_k_points_train + 1)[:-1]
+        ky_list_train = np.linspace(-np.pi, np.pi, n_k_points_train + 1)[:-1]
         
         # Evaluate on training grid
         E_diff_train, single_particle_dm_train, total_chern_number_train, system_chern_number_train, \
@@ -767,8 +866,8 @@ def evaluate_loaded_parameters(res_val, p_val, parameter_file=None, input_dir=No
             plot_results(E_diff_train_plot, strength_durations, n_k_points_train, "Training ", show_training_points=False)
         
         # Evaluate on test grid
-        kx_list_test = np.linspace(-np.pi, np.pi, n_k_points_test)
-        ky_list_test = np.linspace(-np.pi, np.pi, n_k_points_test)
+        kx_list_test = np.linspace(-np.pi, np.pi, n_k_points_test + 1)[:-1]
+        ky_list_test = np.linspace(-np.pi, np.pi, n_k_points_test + 1)[:-1]
         E_diff_test, single_particle_dm_test, total_chern_number_test, system_chern_number_test, \
         bath_chern_number_test, energy_density_test = simulate_grid_with_analysis(
             kx_list_test, ky_list_test, strength_durations, 
@@ -820,8 +919,8 @@ def plot_results(E_diff, optimized_strength_durations, grid_size, title_suffix="
     plt.subplot(1, 2, 1)
     
     # Create coordinate arrays for pcolormesh
-    kx_coords = np.linspace(-np.pi, np.pi, grid_size)
-    ky_coords = np.linspace(-np.pi, np.pi, grid_size)
+    kx_coords = np.linspace(-np.pi, np.pi, grid_size + 1)[:-1]
+    ky_coords = np.linspace(-np.pi, np.pi, grid_size + 1)[:-1]
     
     # Use pcolormesh instead of imshow for better coordinate control
     # Set color scale to start at 0
@@ -1035,8 +1134,8 @@ def train_variational_circuit():
     print("="*60)
     
     # Create training momentum space grid
-    kx_list_train = np.linspace(-np.pi, np.pi, n_k_points_train)
-    ky_list_train = np.linspace(-np.pi, np.pi, n_k_points_train)
+    kx_list_train = np.linspace(-np.pi, np.pi, n_k_points_train + 1)[:-1]
+    ky_list_train = np.linspace(-np.pi, np.pi, n_k_points_train + 1)[:-1]
     
     print(f"Training grid: {len(kx_list_train)}x{len(ky_list_train)} = {len(kx_list_train)*len(ky_list_train)} points")
     
@@ -1061,7 +1160,7 @@ def train_variational_circuit():
     return optimized_strength_durations, opt_result
 
 
-def plot_energy_density_vs_cycles(kx_list_train, ky_list_train, kx_list_test, ky_list_test, strength_durations, max_cycles=20):
+def plot_energy_density_vs_cycles(kx_list_train, ky_list_train, kx_list_test, ky_list_test, strength_durations, max_cycles=50):
     """
     Plot energy density as a function of the number of cooling cycles for both training and test grids
     
@@ -1140,7 +1239,8 @@ def plot_energy_density_vs_cycles(kx_list_train, ky_list_train, kx_list_test, ky
 
 # ===== Progressive Circuit Expansion Functions =====
 
-def run_single_experiment(p_val, kx_list_train, ky_list_train, kx_list_test, ky_list_test, initial_strength_durations=None):
+def run_single_experiment(p_val, kx_list_train, ky_list_train, kx_list_test, ky_list_test, 
+                         initial_strength_durations=None, use_global=False):
     """
     Run a single experiment with given parameters
     
@@ -1149,6 +1249,7 @@ def run_single_experiment(p_val, kx_list_train, ky_list_train, kx_list_test, ky_
         kx_list_train, ky_list_train: training momentum space grids
         kx_list_test, ky_list_test: test momentum space grids
         initial_strength_durations: optional initial parameters (if None, uses trotterized)
+        use_global: if True, use global optimization (basin hopping); if False, use local optimization
     
     Returns:
         tuple: (energy_density_train, energy_density_test, optimized_strength_durations)
@@ -1162,22 +1263,32 @@ def run_single_experiment(p_val, kx_list_train, ky_list_train, kx_list_test, ky_
         # Set new parameter
         p = p_val
         
-        # Get initialization parameters
-        if initial_strength_durations is None:
-            initial_strength_durations = trotterized_evolution_parameters(num_steps=p)
+        if use_global:
+            # Use global optimization (doesn't require initial guess)
+            print(f"Using global optimization for p={p_val}")
+            optimized_strength_durations, opt_result = optimize_strength_durations_global(
+                kx_list_train, ky_list_train[ky_list_train >= 0], 
+                n_cycles=n_cycles_train,
+                niter=50,
+            )
+        else:
+            # Use local optimization (requires initial guess)
+            # Get initialization parameters
+            if initial_strength_durations is None:
+                initial_strength_durations = trotterized_evolution_parameters(num_steps=p)
+            
+            # Optimize the strength_durations on training data
+            optimized_strength_durations, opt_result = optimize_strength_durations(
+                kx_list_train, ky_list_train[ky_list_train >= 0], 
+                n_cycles=n_cycles_train,
+                initial_strength_durations=initial_strength_durations,
+                method='L-BFGS-B'
+            )
         
-        # Optimize the strength_durations on training data
-        optimized_strength_durations, opt_result = optimize_strength_durations(
-            kx_list_train, ky_list_train[ky_list_train >= 0], 
-            n_cycles=n_cycles_train,
-            initial_strength_durations=initial_strength_durations,
-            method='L-BFGS-B'
-        )
-        
-        # Evaluate on training grid (using n_cycles_train to match training)
+        # Evaluate on training grid (using n_cycles_test)
         _, _, _, _, _, energy_density_train = simulate_grid_with_analysis(
             kx_list_train, ky_list_train, optimized_strength_durations, 
-            n_cycles=n_cycles_train
+            n_cycles=n_cycles_test
         )
         
         # Evaluate on test grid (using n_cycles_test)
@@ -1214,11 +1325,14 @@ def run_progressive_circuit_expansion(output_csv=None, params_output_dir=None,
         trotterized_csv = os.path.join(DATA_DIR, 'progressive_circuit_expansion_trotterized.csv')
     
     # Parameter ranges
-    res_values = [3]
-    p_values = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+    res_values = [1, 2, 3, 4]
+    p_values = [2, 3, 4, 5, 6, 7, 8, 9, 10]
+    
+    # Get the smallest p value (will use global optimization for this)
+    smallest_p = min(p_values)
     
     # Fixed test grid size (use current default)
-    n_k_points_test_fixed = 1 + 6*20  # 121
+    n_k_points_test_fixed = 6*20  # 120
     
     # Store results
     results = []
@@ -1232,6 +1346,8 @@ def run_progressive_circuit_expansion(output_csv=None, params_output_dir=None,
     print(f"{'='*60}")
     print(f"Testing {len(res_values)} res values: {res_values}")
     print(f"Testing {len(p_values)} p values: {p_values}")
+    print(f"Smallest p={smallest_p} will use GLOBAL optimization")
+    print(f"Larger p values will use LOCAL optimization")
     print(f"Total experiments: {total_experiments}")
     print(f"Test grid size: {n_k_points_test_fixed}x{n_k_points_test_fixed}")
     print(f"Training cycles: {n_cycles_train}, Test cycles: {n_cycles_test}")
@@ -1240,18 +1356,18 @@ def run_progressive_circuit_expansion(output_csv=None, params_output_dir=None,
     start_time = time.time()
     
     # Track previous optimized parameters for each res value
-    # Each res value is completely independent - starts fresh with trotterized for smallest p
+    # Each res value is completely independent - starts fresh with global optimization for smallest p
     previous_optimized = {}  # key: res, value: (prev_p, optimized_strength_durations)
     
-    kx_list_test = np.linspace(-np.pi, np.pi, n_k_points_test_fixed)
-    ky_list_test = np.linspace(-np.pi, np.pi, n_k_points_test_fixed)
+    kx_list_test = np.linspace(-np.pi, np.pi, n_k_points_test_fixed + 1)[:-1]
+    ky_list_test = np.linspace(-np.pi, np.pi, n_k_points_test_fixed + 1)[:-1]
 
     for res in res_values:
         # Each res starts fresh - no state carried over from previous res values
         # Generate grids for this res value (they're the same for all p values)
-        n_k_points_train_res = 1 + 6 * res
-        kx_list_train = np.linspace(-np.pi, np.pi, n_k_points_train_res)
-        ky_list_train = np.linspace(-np.pi, np.pi, n_k_points_train_res)
+        n_k_points_train_res = 6 * res
+        kx_list_train = np.linspace(-np.pi, np.pi, n_k_points_train_res + 1)[:-1]
+        ky_list_train = np.linspace(-np.pi, np.pi, n_k_points_train_res + 1)[:-1]
         
         for p_val in p_values:
             experiment_count += 1
@@ -1261,27 +1377,32 @@ def run_progressive_circuit_expansion(output_csv=None, params_output_dir=None,
             
             # Now run optimization
             try:
-                # Determine initial parameters
-                # For the first p value of each res, always start with trotterized initialization
-                # For subsequent p values of the same res, expand from previous optimized circuit
-                if res in previous_optimized:
+                # Determine optimization strategy
+                # For the smallest p value, use global optimization
+                # For larger p values, expand from previous optimized circuit and use local optimization
+                if p_val == smallest_p:
+                    # Smallest p: use global optimization (no initial guess needed)
+                    print(f"  Using GLOBAL optimization for smallest p={p_val}")
+                    energy_density_train, energy_density_test, optimized_strength_durations = run_single_experiment(
+                        p_val, kx_list_train, ky_list_train, kx_list_test, ky_list_test, 
+                        use_global=True
+                    )
+                elif res in previous_optimized:
                     prev_p, prev_optimized = previous_optimized[res]
                     if p_val > prev_p:
                         # Expand previous optimized circuit by inserting zero layers
-                        print(f"  Expanding circuit from p={prev_p} to p={p_val}...")
+                        print(f"  Expanding circuit from p={prev_p} to p={p_val} and using LOCAL optimization...")
                         initial_params = expand_strength_durations(prev_optimized, prev_p, p_val)
+                        energy_density_train, energy_density_test, optimized_strength_durations = run_single_experiment(
+                            p_val, kx_list_train, ky_list_train, kx_list_test, ky_list_test, 
+                            initial_strength_durations=initial_params, use_global=False
+                        )
                     else:
-                        # p decreased (shouldn't happen), restart with trotterized
-                        raise ValueError(f"p decreased from {prev_p} to {p_val}, restarting with trotterized initialization")
+                        # p decreased (shouldn't happen), restart with global optimization
+                        raise ValueError(f"p decreased from {prev_p} to {p_val}, this shouldn't happen")
                 else:
-                    # First p value for this res - always use trotterized initialization
-                    print(f"  Starting with trotterized initialization (first p={p_val} for res={res})")
-                    # initial_params = None  # Will trigger trotterized initialization in run_single_experiment
-                    initial_params, _, _, _ = find_best_initialization(kx_list_train, ky_list_train, n_random_trials=100, n_cycles_eval=n_cycles_train, std=1.0, require_monotonic=False)
-                
-                energy_density_train, energy_density_test, optimized_strength_durations = run_single_experiment(
-                    p_val, kx_list_train, ky_list_train, kx_list_test, ky_list_test, initial_strength_durations=initial_params
-                )
+                    # This shouldn't happen if we handle smallest_p correctly above
+                    raise ValueError(f"No previous optimization found for res={res}, p={p_val}, and p != smallest_p")
                 
                 # Store optimized parameters for next iteration
                 previous_optimized[res] = (p_val, optimized_strength_durations)
@@ -1293,7 +1414,7 @@ def run_progressive_circuit_expansion(output_csv=None, params_output_dir=None,
                 
                 results.append({
                     'res': res,
-                    'n_k_points_train': 1 + 6 * res,
+                    'n_k_points_train': 6 * res,
                     'p': p_val,
                     'energy_density_train': energy_density_train,
                     'energy_density_test': energy_density_test
@@ -1313,7 +1434,7 @@ def run_progressive_circuit_expansion(output_csv=None, params_output_dir=None,
                 traceback.print_exc()
                 results.append({
                     'res': res,
-                    'n_k_points_train': 1 + 6 * res,
+                    'n_k_points_train': 6 * res,
                     'p': p_val,
                     'energy_density_train': np.nan,
                     'energy_density_test': np.nan,
@@ -1379,8 +1500,8 @@ def main():
     print("\n" + "="*60)
     print("TESTING PHASE")
     print("="*60)
-    kx_list_test = np.linspace(-np.pi, np.pi, n_k_points_test)
-    ky_list_test = np.linspace(-np.pi, np.pi, n_k_points_test)
+    kx_list_test = np.linspace(-np.pi, np.pi, n_k_points_test + 1)[:-1]
+    ky_list_test = np.linspace(-np.pi, np.pi, n_k_points_test + 1)[:-1]
     E_diff_test, single_particle_dm_test, total_chern_number_test, system_chern_number_test, bath_chern_number_test, energy_density_test = simulate_grid_with_analysis(
         kx_list_test, ky_list_test, optimized_strength_durations, n_cycles_test
     )
@@ -1389,8 +1510,8 @@ def main():
     print("\n" + "="*60)
     print("TRAINING GRID SIMULATION")
     print("="*60)
-    kx_list_train = np.linspace(-np.pi, np.pi, n_k_points_train)
-    ky_list_train = np.linspace(-np.pi, np.pi, n_k_points_train)
+    kx_list_train = np.linspace(-np.pi, np.pi, n_k_points_train + 1)[:-1]
+    ky_list_train = np.linspace(-np.pi, np.pi, n_k_points_train + 1)[:-1]
     E_diff_train, single_particle_dm_train, total_chern_number_train, system_chern_number_train, bath_chern_number_train, energy_density_train = simulate_grid_with_analysis(
         kx_list_train, ky_list_train, optimized_strength_durations, n_cycles_test
     )
@@ -1401,10 +1522,10 @@ def main():
     print("="*60)
     
     # Create momentum space grids for the analysis
-    kx_list_train = np.linspace(-np.pi, np.pi, n_k_points_train)
-    ky_list_train = np.linspace(-np.pi, np.pi, n_k_points_train)
-    kx_list_test = np.linspace(-np.pi, np.pi, n_k_points_test)
-    ky_list_test = np.linspace(-np.pi, np.pi, n_k_points_test)
+    kx_list_train = np.linspace(-np.pi, np.pi, n_k_points_train + 1)[:-1]
+    ky_list_train = np.linspace(-np.pi, np.pi, n_k_points_train + 1)[:-1]
+    kx_list_test = np.linspace(-np.pi, np.pi, n_k_points_test + 1)[:-1]
+    ky_list_test = np.linspace(-np.pi, np.pi, n_k_points_test + 1)[:-1]
     
     # Plot energy density vs cycles for both grids
     cycle_counts, energy_densities_train, energy_densities_test = plot_energy_density_vs_cycles(

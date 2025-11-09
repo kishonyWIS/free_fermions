@@ -21,15 +21,7 @@ from variational_circuit_KSL_numba import (
 
 def main(csv_path: str = None) -> None:
     if csv_path is None:
-        # Try new naming first, fall back to old naming for backward compatibility
-        new_path = os.path.join(DATA_DIR, "progressive_circuit_expansion_results_monotonic_good_starting_from_p3.csv")
-        old_path = os.path.join(DATA_DIR, "grid_search_results_monotonic_good_starting_from_p3.csv")
-        if os.path.exists(new_path):
-            csv_path = new_path
-        elif os.path.exists(old_path):
-            csv_path = old_path
-        else:
-            csv_path = new_path  # Default to new naming
+        csv_path = os.path.join(DATA_DIR, "progressive_circuit_expansion_results.csv")
     df = pd.read_csv(csv_path)
 
     # Use test energy for plots; drop failures
@@ -43,16 +35,16 @@ def main(csv_path: str = None) -> None:
     for res in res_vals:
         dd = df[df.res == res].sort_values("p")
         # Plot test (solid)
-        line_test, = plt.plot(dd.p, dd.energy_density_test, "-o", label=f"res={res}", linewidth=2)
+        line_test, = plt.plot(dd.p, dd.energy_density_test, "-o", label=f"{res*6}", linewidth=2)
         color = line_test.get_color()
         # Plot train (dashed) with same color
         plt.plot(dd.p, dd.energy_density_train, "--o", color=color, alpha=0.8, linewidth=1.5)
     
-    plt.xlabel("p")
-    plt.ylabel("Energy density")
-    plt.title("Energy vs p by res (solid=test, dashed=train)")
+    plt.xlabel("p", fontsize=20)
+    plt.ylabel("Energy density", fontsize=20)
     plt.grid(True, alpha=0.3)
-    plt.legend(title="res", ncol=2)
+    plt.legend(title="$L_{\\text{train}}$", title_fontsize=20, fontsize=17, ncol=2)
+    plt.tick_params(labelsize=17)
     plt.tight_layout()
     
     # Save the figure BEFORE showing it
@@ -98,9 +90,10 @@ def plot_chern_vs_p(df, res_vals=None):
         res_vals = sorted(df["res"].unique())
     
     # Create test grid (fixed for all res values)
-    n_k_points_test = 1 + 6 * 20  # 121
-    kx_list_test = np.linspace(-np.pi, np.pi, n_k_points_test)
-    ky_list_test = np.linspace(-np.pi, np.pi, n_k_points_test)
+    n_k_points_test = 6 * 20  # 120
+    # include the endpoint because of finite derivative for chern number
+    kx_list_test = np.linspace(-np.pi, np.pi, n_k_points_test + 1)
+    ky_list_test = np.linspace(-np.pi, np.pi, n_k_points_test + 1)
     
     plt.figure(figsize=(7, 4))
     
@@ -118,9 +111,10 @@ def plot_chern_vs_p(df, res_vals=None):
         p_vals_valid = []
         
         # Create training grid for this res
-        n_k_points_train = 1 + 6 * res
-        kx_list_train = np.linspace(-np.pi, np.pi, n_k_points_train)
-        ky_list_train = np.linspace(-np.pi, np.pi, n_k_points_train)
+        n_k_points_train = 6 * res
+        # include the endpoint because of finite derivative for chern number
+        kx_list_train = np.linspace(-np.pi, np.pi, n_k_points_train + 1)
+        ky_list_train = np.linspace(-np.pi, np.pi, n_k_points_train + 1)
         
         for p_val in p_vals:
             print(f"  Evaluating p={p_val}...")
@@ -146,7 +140,7 @@ def plot_chern_vs_p(df, res_vals=None):
                 system_chern_test.append(system_chern_te)
                 p_vals_valid.append(p_val)
                 
-                print(f"    System η (train): {system_chern_tr:.4f}, System η (test): {system_chern_te:.4f}")
+                print(f"    System $\\nu$ (train): {system_chern_tr:.4f}, System $\\nu$ (test): {system_chern_te:.4f}")
                 
             except (FileNotFoundError, KeyError) as e:
                 print(f"    Warning: Could not evaluate p={p_val}: {e}")
@@ -158,7 +152,7 @@ def plot_chern_vs_p(df, res_vals=None):
         
         # Plot test (solid) and train (dashed) with same color
         line_test, = plt.plot(p_vals_valid, system_chern_test, "-o", 
-                             label=f"res={res}", linewidth=2)
+                             label=f"{res*6}", linewidth=2)
         color = line_test.get_color()
         plt.plot(p_vals_valid, system_chern_train, "--o", color=color, 
                 alpha=0.8, linewidth=1.5)
@@ -166,11 +160,11 @@ def plot_chern_vs_p(df, res_vals=None):
     # Add horizontal line at target value
     plt.axhline(y=1.0, color='gray', linestyle=':', alpha=0.5, linewidth=1)
     
-    plt.xlabel("p", fontsize=12)
-    plt.ylabel("Finite size spectral Chern number $\\eta$", fontsize=12)
-    plt.title("Finite size spectral Chern number $\\eta$ vs. $p$ by res\n(solid=test, dashed=train)", fontsize=12)
+    plt.xlabel("p", fontsize=20)
+    plt.ylabel("$\\nu$", fontsize=20)
     plt.grid(True, alpha=0.3)
-    plt.legend(title="res", ncol=2, fontsize=10)
+    plt.legend(title="$L_{\\text{train}}$", title_fontsize=20, fontsize=17, ncol=2)
+    plt.tick_params(labelsize=17)
     plt.tight_layout()
     
     # Save figure
