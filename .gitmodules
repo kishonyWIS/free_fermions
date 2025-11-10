@@ -1,0 +1,3 @@
+[submodule "Variational-Cooling-KSL"]
+	path = Variational-Cooling-KSL
+	url = https://github.com/kishonyWIS/variational_cooling_ksl.git
