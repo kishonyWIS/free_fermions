@@ -66,7 +66,7 @@ Weizmann Institute of Science,
 Rehovot 76100, Israel}
 
 \begin{abstract}
-We present an efficient approach for preparing the ground state of the chiral phase of the Kitaev spin liquid (KSL) model using shallow-depth quantum circuits. By combining the fermionic cooling approach of Ref.~\cite{Kishony_2025} with the variational optimization strategy of Ref.~\cite{song2025varicoolnonunitaryquantumvariational}, we develop a protocol that replaces the large-depth Trotterized evolution (requiring on the order of 100 steps) with an optimized circuit containing only a few layers. The protocol is trained on small momentum-space grids and demonstrates good transferability to larger system sizes. We systematically explore the performance as a function of circuit depth and training system size, showing that even with $p=5$ layers, the protocol achieves a state with a residual energy density below 0.025 in the units of the gap.
+We present an efficient approach for preparing the ground state of the chiral phase of the Kitaev spin liquid (KSL) model using shallow-depth quantum circuits. By combining the fermionic cooling approach of Ref.~\cite{Kishony_2025} with the variational optimization strategy of Ref.~\cite{song2025varicoolnonunitaryquantumvariational}, we develop a protocol that replaces the large-depth Trotterized evolution (requiring on the order of 100 steps) with an optimized circuit containing only a few layers. The protocol is trained on small momentum-space grids and demonstrates good transferability to larger system sizes. We systematically explore the performance as a function of circuit depth and training system size, showing that even with $p=5$ layers, the protocol achieves a state with a residual energy density of $0.012$ in the units of the gap.
 \end{abstract}
 
 \maketitle
@@ -244,6 +244,7 @@ The loss function for training is computed as follows. For each momentum point $
 \mathcal{L} = \frac{1}{2L_{\text{train}}^2}\sqrt{\sum_{\bm{k}} \left(E(\bm{k}) - E_0(\bm{k})\right)^2},
 \end{align}
 where $E_0(\bm{k})$ is the ground state energy at momentum point $\bm{k}$, and the factor of $1/2$ accounts for the fact that we count both $\bm{k}$ and $-\bm{k}$ in our summation over the full Brillouin zone. The RMS loss is chosen because it penalizes large energy deviations more strongly than the mean absolute error, ensuring that the protocol performs well across the entire Brillouin zone rather than just on average.
+As discussed in Ref.~\cite{song2025varicoolnonunitaryquantumvariational}, minimizing the loss function after a few cycles of cooling ballances the trade-off between goals (i) and (iii) above.
 
 \subsection{Progressive Circuit Expansion}
 
@@ -259,17 +260,24 @@ This approach, allows us to systematically explore increasing circuit depths whi
 
 \section{Results}
 
+Throughout this section, we present results for the chiral phase of the Kitaev spin liquid model with exchange couplings $\mathcal{J}_x = \mathcal{J}_y = \mathcal{J}_z = 1$ and three-spin interaction strength $\kappa = 1$. We use $T_{\text{train}} = 5$ cooling cycles to train the circuit.
+We use the state reached after $T_{\text{steady}} = 40$ cooling cycles as a proxy for the steady state.
+Various system sizes $L_{\text{train}}$ are used for training. The performance is evaluated on a test system of size $L_{\text{test}} = 120$.
+
 \subsection{Energy vs. Circuit Depth}
 
 \begin{figure}
 \begin{centering}
 \includegraphics[width=(\textwidth-\columnsep)/2]{figures/energy_vs_p_by_res.pdf}
 \par\end{centering}
-\caption{\textbf{Energy density vs. circuit depth $p$ for different training system sizes.} Solid lines show test grid performance, dashed lines show training grid performance. Results are shown for training system with $L_{\text{train}} = 18$ (primary focus) and other system sizes. The protocol achieves near-optimal performance even with $p=3$ layers.}
+\caption{\textbf{Energy density vs. circuit depth $p$ for different training system sizes.} Solid lines show test grid performance, dashed lines show training grid performance. Results are shown for various training system sizes. The protocol achieves near-optimal performance even with $p=5$ layers.}
 \label{fig:energy_vs_p}
 \end{figure}
 
-Fig.~\ref{fig:energy_vs_p} shows the energy density as a function of circuit depth $p$ for different training system sizes. We observe that even with $p=3$ layers, the protocol achieves performance comparable to much deeper circuits, demonstrating the effectiveness of the variational optimization.
+Fig.~\ref{fig:energy_vs_p} shows the energy density as a function of circuit depth $p$ for different training system sizes evaluated for both the training and test system sizes.
+When the training system size is small, the training protocol overfits to the training system and the trained circuits perform poorly on the test system.
+However, as the training system size increases, the gap in performance between the training and test system sizes vanishes.
+We observe that even with $p=5$ layers, the protocol achieves performance comparable to much deeper circuits, demonstrating the effectiveness of the variational optimization.
 
 \subsection{Finite Size Spectral Chern Number vs. Circuit Depth}
 
@@ -284,7 +292,7 @@ where $R$ is the single-particle density matrix of the system fermions, $R_{s,s'
 \begin{centering}
 \includegraphics[width=(\textwidth-\columnsep)/2]{figures/chern_vs_p.pdf}
 \par\end{centering}
-\caption{\textbf{Finite size spectral Chern number $\nu$ vs. circuit depth $p$ for different training system sizes.} Solid lines show test grid performance, dashed lines show training grid performance. The target value is $\nu=1$ for the system fermions. Results are shown for training system with $L_{\text{train}} = 18$ (primary focus) and other system sizes. The protocol successfully prepares states with the correct topological invariant even with shallow circuits.}
+\caption{\textbf{Finite size spectral Chern number $\nu$ vs. circuit depth $p$ for different training system sizes.} Solid lines show test system performance, dashed lines show training system performance. The target value is $\nu=1$ for the system fermions. Results are shown for various training system sizes. The protocol successfully prepares states with the correct topological invariant even with shallow circuits.}
 \label{fig:chern_vs_p}
 \end{figure}
 
@@ -299,6 +307,7 @@ where $R$ is the single-particle density matrix of the system fermions, $R_{s,s'
 \end{figure}
 
 Fig.~\ref{fig:energy_vs_cycles} demonstrates the convergence of the energy density as a function of the number of cooling cycles. The protocol rapidly approaches its steady state, with most of the cooling occurring within the first cycle.
+In the adiabatic limit, the protocol of Ref.~\cite{Kishony_2025} is able to reach the ground state within a single cycle. Here, using a much lower depth circuit, the protocol takes advantage of the repeated cooling cycles to reach a lower energy steady state than could be reached in a single cycle.
 
 \subsection{Energy Heatmaps}
 
@@ -334,7 +343,7 @@ Fig.~\ref{fig:parameters_vs_layer} displays the optimized variational parameters
 
 \section{Discussion}
 
-Our results demonstrate that variational optimization can dramatically compress the depth of fermionic cooling circuits while maintaining high fidelity ground state preparation. The key insights are:
+Our results demonstrate that variational optimization can dramatically compress the depth of fermionic cooling circuits while maintaining high fidelity ground state preparation.
 
 Future directions include extending this approach to interacting fermionic systems, exploring different circuit ansätze, and investigating the performance on quantum hardware with noise.
 
