@@ -74,7 +74,7 @@ def main(csv_path: str = None) -> None:
 
 def plot_chern_vs_p(df, res_vals=None):
     """
-    Generate chern_vs_p.pdf - Finite size spectral Chern number (η) vs. circuit depth p
+    Generate chern_vs_p.pdf - Finite size spectral Chern number (ν) vs. circuit depth p
     
     Args:
         df: DataFrame with results from progressive circuit expansion
